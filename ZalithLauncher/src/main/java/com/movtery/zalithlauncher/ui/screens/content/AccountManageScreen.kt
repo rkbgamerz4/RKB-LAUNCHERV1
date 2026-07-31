@@ -437,19 +437,15 @@ private fun MicrosoftLoginOperation(
                     )
                 },
                 onConfirm = {
-                    actions.onIntent(
-                        AccountManageIntent.UpdateMicrosoftLoginOp(
-                            MicrosoftLoginOperation.None
-                        )
-                    )
-                    actions.onIntent(
-                        AccountManageIntent.PerformMicrosoftLogin(
-                            toWeb = actions.navigateToWeb,
-                            backToMain = actions.backToMainScreen,
-                            checkIfInWebScreen = actions.checkIfInWebScreen
-                        )
-                    )
-                },
+    actions.onIntent(
+        AccountManageIntent.UpdateMicrosoftLoginOp(
+            MicrosoftLoginOperation.None
+        )
+    )
+    // CHANGED: Microsoft login flow bypassed — "Login" now opens the
+    // offline/local account dialog instead of PerformMicrosoftLogin.
+    actions.onIntent(AccountManageIntent.UpdateLocalLoginOp(LocalLoginOperation.Edit))
+},
                 openLink = actions.openLink
             )
         }
