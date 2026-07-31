@@ -1,20 +1,3 @@
-
-
-private val rkbDark = darkColorScheme(
-    primary = Color(0xFF00A8FF),
-    onPrimary = Color.White,
-    secondary = Color(0xFF0095E8),
-    onSecondary = Color.White,
-    background = Color(0xFF050814),
-    onBackground = Color.White,
-    surface = Color(0xFF0D1224),
-    onSurface = Color.White,
-    surfaceVariant = Color(0xFF151C30),
-    onSurfaceVariant = Color(0xFFB8C7E0),
-    outline = Color(0xFF2A3C55),
-    error = Color(0xFFFF5252)
-)
-
 /*
  * Zalith Launcher 2
  * Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
