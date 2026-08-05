@@ -24,4 +24,3 @@ val LocalExtendedColors = staticCompositionLocalOf {
         divider = Color(0xFF1F2937)
     )
 }
-
