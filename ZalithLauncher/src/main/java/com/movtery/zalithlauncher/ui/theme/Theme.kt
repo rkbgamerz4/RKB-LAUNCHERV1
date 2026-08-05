@@ -673,15 +673,22 @@ fun ZalithLauncherTheme(
         }
     }
 
-    CompositionLocalProvider(
-        LocalBackgroundViewModel provides backgroundViewModel,
-        LocalFestivals provides festivals
-    ) {
-        MaterialExpressiveTheme(
-            colorScheme = currentDisplayScheme,
-            motionScheme = MotionScheme.expressive(),
-            typography = AppTypography,
-            content = content
-        )
-    }
+      CompositionLocalProvider(
+    LocalBackgroundViewModel provides backgroundViewModel,
+    LocalFestivals provides festivals,
+    LocalExtendedColors provides ExtendedColors(
+        accentBlue = Color(0xFF00A8FF),
+        textPrimary = Color.White,
+        textSecondary = Color(0xFFB8C7D9),
+        textTertiary = Color(0xFF7E8A9A),
+        cardBackground = Color(0xFF111827),
+        divider = Color(0xFF1F2937)
+    )
+) {
+    MaterialExpressiveTheme(
+        colorScheme = currentDisplayScheme,
+        motionScheme = MotionScheme.expressive(),
+        typography = AppTypography,
+        content = content
+    )
 }
