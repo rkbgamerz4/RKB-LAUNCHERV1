@@ -2,8 +2,6 @@ package com.movtery.zalithlauncher.ui.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 @Immutable
@@ -27,6 +25,3 @@ val LocalExtendedColors = staticCompositionLocalOf {
     )
 }
 
-val MaterialTheme.extendedColors: ExtendedColors
-    @Composable
-    get() = LocalExtendedColors.current
