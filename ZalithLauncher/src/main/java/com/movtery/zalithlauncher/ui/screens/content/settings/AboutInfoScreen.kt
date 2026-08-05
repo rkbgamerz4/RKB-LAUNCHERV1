@@ -121,14 +121,14 @@ fun AboutInfoScreen(
                         )
 
                         ButtonIconItem(
-                            icon = painterResource(R.drawable.img_avatar_movtery),
+                            icon = painterResource(R.drawable.img_avatar_rkb.png),
                             title = stringResource(R.string.about_launcher_author_movtery_title),
                             text = stringResource(R.string.about_launcher_author_movtery_text, BuildKeys.LAUNCHER_NAME),
                             button = {
                                 Button(
-                                    onClick = { openLink(URL_SUPPORT) }
+                                    onClick = { openLink(https://discord.gg/YMfD2GZvur) }
                                 ) {
-                                    Text(text = stringResource(R.string.about_sponsor))
+                                    Text(text = stringResource(R.string.about_discord))
                                 }
                             }
                         )
