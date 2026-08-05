@@ -691,4 +691,6 @@ fun ZalithLauncherTheme(
         typography = AppTypography,
         content = content
     )
+  }
+
 }
