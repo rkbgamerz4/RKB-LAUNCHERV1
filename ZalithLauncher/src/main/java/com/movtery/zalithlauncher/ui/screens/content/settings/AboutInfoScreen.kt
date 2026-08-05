@@ -121,17 +121,19 @@ fun AboutInfoScreen(
                         )
 
                         ButtonIconItem(
-                            icon = painterResource(R.drawable.img_avatar_rkb.png),
-                            title = stringResource(R.string.about_launcher_author_movtery_title),
-                            text = stringResource(R.string.about_launcher_author_movtery_text, BuildKeys.LAUNCHER_NAME),
-                            button = {
-                                Button(
-                                    onClick = { openLink(https://discord.gg/YMfD2GZvur) }
-                                ) {
-                                    Text(text = stringResource(R.string.about_discord))
-                                }
-                            }
-                        )
+    icon = painterResource(R.drawable.img_avatar_rkb),
+    title = "RKB GAMERZ",
+    text = "Author of ${BuildKeys.LAUNCHER_NAME}",
+    button = {
+        Button(
+            onClick = {
+                openLink("https://discord.gg/YMfD2GZvur")
+            }
+        ) {
+            Text("Discord")
+        }
+    }
+)
                     }
                 }
             }
