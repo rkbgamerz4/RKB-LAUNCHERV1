@@ -1,5 +1,8 @@
+@file:Suppress("DEPRECATION")
+
 /*
  * RKB Launcher
+ * ...
  * Premium Minecraft Java Launcher — AMOLED Dark Design System
  *
  * Buttons.kt
