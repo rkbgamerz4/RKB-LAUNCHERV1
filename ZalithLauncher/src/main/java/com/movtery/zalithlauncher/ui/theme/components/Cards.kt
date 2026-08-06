@@ -6,7 +6,8 @@
  * Glassmorphism card primitives: translucent fill, gradient hairline
  * border, soft ambient shadow. Built as a single flexible GlassCard plus
  * a few purpose-built wrappers (stat tile, section card).
-*/
+ */
+
 package com.movtery.zalithlauncher.ui.theme.components
 
 import androidx.compose.animation.core.Spring
@@ -18,6 +19,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ripple.rememberRipple
@@ -54,7 +56,7 @@ fun GlassCard(
     borderBrush: Brush = Brush.linearGradient(RkbGradients.cardBorder),
     onClick: (() -> Unit)? = null,
     contentPadding: Dp = 20.dp,
-    content: @Composable Column.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     val ext = MaterialTheme.rkbColors
     val interactionSource = remember { MutableInteractionSource() }
@@ -133,7 +135,7 @@ fun RKBSectionCard(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    content: @Composable Column.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     GlassCard(modifier = modifier.fillMaxWidth(), borderBrush = Brush.linearGradient(
         listOf(MaterialTheme.rkbColors.glassStroke, MaterialTheme.rkbColors.glassStroke)
