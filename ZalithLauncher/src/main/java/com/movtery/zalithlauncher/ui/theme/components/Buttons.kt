@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import com.movtery.zalithlauncher.ui.theme.RkbShape
-import com.movtery.zalithlauncher.ui.theme.extendedColors
+import com.movtery.zalithlauncher.ui.theme.rkbColors
 
 private val PressSpring = spring<Float>(
     dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -83,7 +83,7 @@ fun RKBPrimaryButton(
         animationSpec = PressSpring,
         label = "primaryButtonGlow",
     )
-    val ext = MaterialTheme.extendedColors
+    val ext = MaterialTheme.rkbColors
 
     Box(
         modifier = modifier
@@ -155,7 +155,7 @@ fun RKBSecondaryButton(
         animationSpec = PressSpring,
         label = "secondaryButtonScale",
     )
-    val ext = MaterialTheme.extendedColors
+    val ext = MaterialTheme.rkbColors
     val borderColor by animateColorAsState(
         targetValue = if (pressed) ext.accentBlue else ext.glassStroke,
         label = "secondaryButtonBorder",
@@ -216,7 +216,7 @@ fun RKBIconButton(
         animationSpec = PressSpring,
         label = "iconButtonScale",
     )
-    val ext = MaterialTheme.extendedColors
+    val ext = MaterialTheme.rkbColors
     val bg by animateColorAsState(
         targetValue = if (active) ext.accentBlue.copy(alpha = 0.16f) else Color.Transparent,
         label = "iconButtonBg",
@@ -260,7 +260,7 @@ fun RKBChipButton(
     selected: Boolean = false,
     leadingIcon: ImageVector? = null,
 ) {
-    val ext = MaterialTheme.extendedColors
+    val ext = MaterialTheme.rkbColors
     val interactionSource = remember { MutableInteractionSource() }
     val bg by animateColorAsState(
         targetValue = if (selected) ext.accentBlue.copy(alpha = 0.18f) else ext.glassFill,
