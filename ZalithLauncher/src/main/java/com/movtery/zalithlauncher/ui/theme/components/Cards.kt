@@ -1,14 +1,13 @@
-@file:Suppress("DEPRECATION")
-
 /*
  * RKB Launcher
- * ...
  * Premium Minecraft Java Launcher — AMOLED Dark Design System
+ *
  * Cards.kt
  * Glassmorphism card primitives: translucent fill, gradient hairline
  * border, soft ambient shadow. Built as a single flexible GlassCard plus
  * a few purpose-built wrappers (stat tile, section card).
  */
+
 package com.movtery.zalithlauncher.ui.theme.components
 
 import androidx.compose.animation.core.Spring
@@ -23,7 +22,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +41,6 @@ import androidx.compose.foundation.clickable
 import com.movtery.zalithlauncher.ui.theme.RkbGradients
 import com.movtery.zalithlauncher.ui.theme.RkbShape
 import com.movtery.zalithlauncher.ui.theme.rkbColors
-
 /**
  * The core glassmorphism surface used everywhere in RKB Launcher:
  * translucent background over whatever sits behind it, a soft blue-tinted
@@ -84,7 +82,7 @@ fun GlassCard(
     val clickable = if (onClick != null) {
         base.clickable(
             interactionSource = interactionSource,
-            indication = rememberRipple(color = ext.accentBlue),
+            indication = ripple(color = ext.accentBlue),
             onClick = onClick,
         )
     } else base
@@ -94,7 +92,6 @@ fun GlassCard(
         content = content,
     )
 }
-
 /**
  * Compact stat tile for quick-glance numbers (FPS avg, playtime, mods
  * installed, etc.) — used in grids on the home screen.
@@ -126,7 +123,6 @@ fun RKBStatCard(
         }
     }
 }
-
 /**
  * A titled section wrapper — groups related settings/content under a
  * heading, consistent spacing, used throughout the Settings screen.
