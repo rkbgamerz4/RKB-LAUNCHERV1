@@ -1,8 +1,5 @@
-@file:Suppress("DEPRECATION")
-
 /*
  * RKB Launcher
- * ...
  * Premium Minecraft Java Launcher — AMOLED Dark Design System
  *
  * Buttons.kt
@@ -29,7 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +55,6 @@ private val PressSpring = spring<Float>(
     dampingRatio = Spring.DampingRatioMediumBouncy,
     stiffness = Spring.StiffnessMedium,
 )
-
 /**
  * Primary CTA button. Gradient fill (accentBlue -> accentViolet), soft blue
  * glow shadow, scale-down press animation, ripple. This is the "Play"
@@ -110,7 +106,7 @@ fun RKBPrimaryButton(
             )
             .clickable(
                 interactionSource = interactionSource,
-                indication = rememberRipple(color = Color.White),
+                indication = ripple(color = Color.White),
                 enabled = enabled,
                 role = Role.Button,
                 onClick = onClick,
@@ -137,7 +133,6 @@ fun RKBPrimaryButton(
         }
     }
 }
-
 /**
  * Secondary action button — transparent glass fill, glowing outline,
  * used for "Cancel", "View more", toolbar actions.
@@ -173,7 +168,7 @@ fun RKBSecondaryButton(
             .border(width = 1.dp, color = borderColor, shape = shape)
             .clickable(
                 interactionSource = interactionSource,
-                indication = rememberRipple(color = ext.accentBlue),
+                indication = ripple(color = ext.accentBlue),
                 role = Role.Button,
                 onClick = onClick,
             )
@@ -198,7 +193,6 @@ fun RKBSecondaryButton(
         }
     }
 }
-
 /**
  * Circular icon button with an animated glow ring when active/selected —
  * used in the sidebar and toolbars.
@@ -237,7 +231,7 @@ fun RKBIconButton(
             .background(bg)
             .clickable(
                 interactionSource = interactionSource,
-                indication = rememberRipple(bounded = true, color = ext.accentBlue),
+                indication = ripple(bounded = true, color = ext.accentBlue),
                 role = Role.Button,
                 onClick = onClick,
             ),
@@ -251,7 +245,6 @@ fun RKBIconButton(
         )
     }
 }
-
 /**
  * Small pill chip-button — quick actions, filter toggles, version tags.
  */
@@ -287,7 +280,7 @@ fun RKBChipButton(
             .border(1.dp, border, RkbShape.buttonPill)
             .clickable(
                 interactionSource = interactionSource,
-                indication = rememberRipple(color = ext.accentBlue),
+                indication = ripple(color = ext.accentBlue),
                 role = Role.Button,
                 onClick = onClick,
             )
