@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import com.movtery.zalithlauncher.ui.theme.RkbGradients
 import com.movtery.zalithlauncher.ui.theme.RkbShape
-import com.movtery.zalithlauncher.ui.theme.extendedColors
+import com.movtery.zalithlauncher.ui.theme.rkbColors
 
 /**
  * The core glassmorphism surface used everywhere in RKB Launcher:
@@ -57,7 +57,7 @@ fun GlassCard(
     contentPadding: Dp = 20.dp,
     content: @Composable Column.() -> Unit,
 ) {
-    val ext = MaterialTheme.extendedColors
+    val ext = MaterialTheme.rkbColors
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -102,7 +102,7 @@ fun RKBStatCard(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
-    accent: Color = MaterialTheme.extendedColors.accentBlue,
+    accent: Color = MaterialTheme.rkbColors.accentBlue,
 ) {
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -119,7 +119,7 @@ fun RKBStatCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.extendedColors.textSecondary,
+                color = MaterialTheme.rkbColors.textSecondary,
             )
         }
     }
@@ -137,18 +137,18 @@ fun RKBSectionCard(
     content: @Composable Column.() -> Unit,
 ) {
     GlassCard(modifier = modifier.fillMaxWidth(), borderBrush = Brush.linearGradient(
-        listOf(MaterialTheme.extendedColors.glassStroke, MaterialTheme.extendedColors.glassStroke)
+        listOf(MaterialTheme.rkbColors.glassStroke, MaterialTheme.rkbColors.glassStroke)
     )) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.extendedColors.textPrimary,
+            color = MaterialTheme.rkbColors.textPrimary,
         )
         if (subtitle != null) {
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.extendedColors.textTertiary,
+                color = MaterialTheme.rkbColors.textTertiary,
                 modifier = Modifier.padding(top = 2.dp, bottom = 12.dp),
             )
         } else {
