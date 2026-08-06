@@ -7,7 +7,6 @@
  * border, soft ambient shadow. Built as a single flexible GlassCard plus
  * a few purpose-built wrappers (stat tile, section card).
  */
-
 package com.movtery.zalithlauncher.ui.theme.components
 
 import androidx.compose.animation.core.Spring
