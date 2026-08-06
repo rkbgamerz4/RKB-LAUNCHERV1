@@ -1,7 +1,6 @@
 /*
  * RKB Launcher
  * Premium Minecraft Java Launcher — AMOLED Dark Design System
- *
  * Cards.kt
  * Glassmorphism card primitives: translucent fill, gradient hairline
  * border, soft ambient shadow. Built as a single flexible GlassCard plus
