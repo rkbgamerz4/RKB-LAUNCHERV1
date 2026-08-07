@@ -77,6 +77,7 @@ import com.movtery.zalithlauncher.upgrade.TooFrequentOperationException
 import com.movtery.zalithlauncher.utils.compareLangTag
 import com.movtery.zalithlauncher.utils.copyText
 import com.movtery.zalithlauncher.utils.device.VulkanChecker
+import com.movtery.zalithlauncher.utils.festival.LocalFestivals
 import com.movtery.zalithlauncher.utils.festival.getTodayFestivals
 import com.movtery.zalithlauncher.utils.file.shareFile
 import com.movtery.zalithlauncher.utils.isChinese
@@ -395,6 +396,14 @@ class MainActivity : BaseAppCompatActivity() {
                     }
                 )
 
+                //用户确认使用移动网络 操作流程
+                ModpackConfirmUseMobileDataOperation(
+                    operation = modpackImportViewModel.confirmMobileDataOperation,
+                    onConfirmUse = { use ->
+                        modpackImportViewModel.confirmUseMobileData(use)
+                    }
+                )
+
                 //启动器主页操作流程
                 val homePageOp by homePageViewModel.pageOp.collectAsStateWithLifecycle()
                 HomePageOperation(
@@ -648,7 +657,6 @@ class MainActivity : BaseAppCompatActivity() {
         }.find { drive ->
             locale.compareLangTag(drive.language)
         }
-
         withContext(Dispatchers.Main) {
             val builder = MaterialAlertDialogBuilder(this@MainActivity)
                 .setTitle(R.string.plugin_download_title)
@@ -807,12 +815,3 @@ class MainActivity : BaseAppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 }
-
-
-                //用户确认使用移动网络 操作流程
-                ModpackConfirmUseMobileDataOperation(
-                    operation = modpackImportViewModel.confirmMobileDataOperation,
-                    onConfirmUse = { use ->
-                        modpackImportViewModel.confirmUseMobileData(use)
-                    }
-                )
