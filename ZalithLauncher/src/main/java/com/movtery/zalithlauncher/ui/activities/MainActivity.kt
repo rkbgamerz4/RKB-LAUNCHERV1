@@ -85,6 +85,7 @@ import com.movtery.zalithlauncher.utils.network.openLink
 import com.movtery.zalithlauncher.utils.network.openLinkInternal
 import com.movtery.zalithlauncher.utils.string.getMessageOrToString
 import com.movtery.zalithlauncher.viewmodel.BackgroundViewModel
+import com.movtery.zalithlauncher.viewmodel.LocalBackgroundViewModel
 import com.movtery.zalithlauncher.viewmodel.ErrorViewModel
 import com.movtery.zalithlauncher.viewmodel.EventViewModel
 import com.movtery.zalithlauncher.viewmodel.HomePageOperation
@@ -206,6 +207,7 @@ class MainActivity : BaseAppCompatActivity() {
                 }
             }
         }
+
         //事件处理
         lifecycleScope.launch {
             eventViewModel.events.collect { event ->
@@ -295,6 +297,10 @@ class MainActivity : BaseAppCompatActivity() {
 
         setContent {
             RKBLauncherTheme {
+              CompositionLocalProvider(
+                LocalBackgroundViewModel provides backgroundViewModel,
+                LocalFestivals provides festivals
+              ) {
                 ObserveFullScreenSetting(AllSettings.launcherFullScreen.state)
                 Box {
                     Background(
@@ -389,14 +395,6 @@ class MainActivity : BaseAppCompatActivity() {
                     }
                 )
 
-                //用户确认使用移动网络 操作流程
-                ModpackConfirmUseMobileDataOperation(
-                    operation = modpackImportViewModel.confirmMobileDataOperation,
-                    onConfirmUse = { use ->
-                        modpackImportViewModel.confirmUseMobileData(use)
-                    }
-                )
-
                 //启动器主页操作流程
                 val homePageOp by homePageViewModel.pageOp.collectAsStateWithLifecycle()
                 HomePageOperation(
@@ -436,6 +434,7 @@ class MainActivity : BaseAppCompatActivity() {
                         }
                     )
                 }
+
                 ShareLinkOperation(
                     operation = logsUploadViewModel.operation,
                     onChange = { logsUploadViewModel.operation = it },
@@ -474,6 +473,7 @@ class MainActivity : BaseAppCompatActivity() {
                         AllSettings.autoVulkanChecker.save(false)
                     }
                 )
+              }
             }
         }
     }
@@ -807,3 +807,12 @@ class MainActivity : BaseAppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 }
+
+
+                //用户确认使用移动网络 操作流程
+                ModpackConfirmUseMobileDataOperation(
+                    operation = modpackImportViewModel.confirmMobileDataOperation,
+                    onConfirmUse = { use ->
+                        modpackImportViewModel.confirmUseMobileData(use)
+                    }
+                )
