@@ -1,4 +1,4 @@
-/*
+ */
  * Zalith Launcher 2
  * Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
  *
@@ -35,6 +35,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -87,6 +89,9 @@ import com.movtery.zalithlauncher.ui.screens.content.elements.CommonVersionInfoL
 import com.movtery.zalithlauncher.ui.screens.content.elements.VersionIconImage
 import com.movtery.zalithlauncher.ui.screens.main.custom_home.MarkdownBlock
 import com.movtery.zalithlauncher.ui.screens.main.custom_home.customHomePage
+import com.movtery.zalithlauncher.ui.theme.RkbShape
+import com.movtery.zalithlauncher.ui.theme.components.GlassCard
+import com.movtery.zalithlauncher.ui.theme.components.RKBPrimaryButton
 import com.movtery.zalithlauncher.utils.animation.swapAnimateDpAsState
 import com.movtery.zalithlauncher.viewmodel.HomePageState
 import com.movtery.zalithlauncher.viewmodel.LocalHomePageViewModel
@@ -178,12 +183,13 @@ private fun ContentMenu(
         if (BuildConfig.DEBUG) {
             item {
                 //debug版本关不掉的警告，防止有人把测试版当正式版用 XD
-                BackgroundCard(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                GlassCard(
+                    shape = RkbShape.cardLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
@@ -239,7 +245,6 @@ private fun ContentMenu(
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RightMenuContent(
@@ -402,9 +407,10 @@ private fun RightMenu(
         isHorizontal = true
     )
 
-    BackgroundCard(
+    GlassCard(
         modifier = modifier.offset { IntOffset(x = xOffset.roundToPx(), y = 0) },
-        shape = MaterialTheme.shapes.extraLarge
+        shape = RkbShape.cardLarge,
+        contentPadding = 0.dp,
     ) {
         RightMenuContent(
             modifier = Modifier.fillMaxSize(),
@@ -412,12 +418,12 @@ private fun RightMenu(
             toAccountManageScreen = toAccountManageScreen,
             toVersionManageScreen = toVersionManageScreen,
             toVersionSettingsScreen = toVersionSettingsScreen
-        ) { innerModifier, onClick, text ->
-            ScalingActionButton(
-                modifier = innerModifier,
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp),
+        ) { innerModifier, onClick, _ ->
+            RKBPrimaryButton(
+                text = stringResource(R.string.main_launch_game),
                 onClick = onClick,
-                content = text
+                icon = Icons.Rounded.PlayArrow,
+                modifier = innerModifier,
             )
         }
     }
