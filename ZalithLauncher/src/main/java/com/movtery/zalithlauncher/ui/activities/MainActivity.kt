@@ -206,7 +206,6 @@ class MainActivity : BaseAppCompatActivity() {
                 }
             }
         }
-
         //事件处理
         lifecycleScope.launch {
             eventViewModel.events.collect { event ->
@@ -295,10 +294,7 @@ class MainActivity : BaseAppCompatActivity() {
         )
 
         setContent {
-            ZalithLauncherTheme(
-                backgroundViewModel = backgroundViewModel,
-                festivals = festivals
-            ) {
+            RKBLauncherTheme {
                 ObserveFullScreenSetting(AllSettings.launcherFullScreen.state)
                 Box {
                     Background(
@@ -440,7 +436,6 @@ class MainActivity : BaseAppCompatActivity() {
                         }
                     )
                 }
-
                 ShareLinkOperation(
                     operation = logsUploadViewModel.operation,
                     onChange = { logsUploadViewModel.operation = it },
