@@ -36,8 +36,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.movtery.zalithlauncher.ui.components.BackgroundCard
 import com.movtery.zalithlauncher.ui.components.TitleAndSummary
+import com.movtery.zalithlauncher.ui.theme.components.GlassCard
 
 /**
  * 根据卡片在UI组中的位置，选择不同的圆角形状
@@ -211,9 +211,10 @@ fun SettingsCard(
 ) {
     val shape = rememberSettingsCardShape(position, outerShape, innerShape)
 
-    BackgroundCard(
+    GlassCard(
         modifier = modifier,
         shape = shape,
+        contentPadding = 0.dp,
         content = content
     )
 }
@@ -230,11 +231,12 @@ fun SettingsCard(
 ) {
     val shape = rememberSettingsCardShape(position, outerShape, innerShape)
 
-    BackgroundCard(
+    GlassCard(
         modifier = modifier,
         shape = shape,
         onClick = onClick,
         enabled = enabled,
+        contentPadding = 0.dp,
         content = content
     )
 }
@@ -256,11 +258,12 @@ fun SettingsCard(
 ) {
     val shape = rememberSettingsCardShape(position, outerShape, innerShape)
 
-    BackgroundCard(
+    GlassCard(
         modifier = modifier,
         shape = shape,
         onClick = onClick,
-        enabled = enabled
+        enabled = enabled,
+        contentPadding = 0.dp,
     ) {
         Row(
             modifier = Modifier
