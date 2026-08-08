@@ -10,10 +10,10 @@
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/gpl-3.0.txt>.
+ * along with this program.
+ * If not, see <https://www.gnu.org/licenses/gpl-3.0.txt>.
  */
 
 package com.movtery.zalithlauncher.ui.screens.content.settings
@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+
 import com.movtery.zalithlauncher.BuildConfig
 import com.movtery.zalithlauncher.BuildKeys
 import com.movtery.zalithlauncher.R
@@ -64,8 +65,6 @@ import com.movtery.zalithlauncher.library.LibraryInfo
 import com.movtery.zalithlauncher.library.libraryData
 import com.movtery.zalithlauncher.path.URL_COMMUNITY
 import com.movtery.zalithlauncher.path.URL_MCMOD
-import com.movtery.zalithlauncher.path.URL_PROJECT
-import com.movtery.zalithlauncher.path.URL_SUPPORT
 import com.movtery.zalithlauncher.path.URL_WEBLATE
 import com.movtery.zalithlauncher.ui.base.BaseScreen
 import com.movtery.zalithlauncher.ui.components.AnimatedLazyColumn
@@ -77,6 +76,10 @@ import com.movtery.zalithlauncher.ui.screens.content.settings.layouts.CardPositi
 import com.movtery.zalithlauncher.ui.screens.content.settings.layouts.SettingsCard
 import com.movtery.zalithlauncher.ui.theme.itemColor
 import com.movtery.zalithlauncher.ui.theme.onItemColor
+
+private const val RKB_WEBSITE = "https://rkblauncher.netlify.app"
+private const val RKB_DISCORD = "https://discord.gg/YMfD2GZvur"
+private const val COMMUNITY_DISCORD = "https://discord.gg/uhPvxrAS6m"
 
 @Composable
 fun AboutInfoScreen(
@@ -96,111 +99,171 @@ fun AboutInfoScreen(
             isVisible = isVisible,
             contentPadding = PaddingValues(all = 12.dp)
         ) { scope ->
+
             animatedItem(scope) { yOffset ->
                 ChunkLayout(
-                    modifier = Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) },
+                    modifier = Modifier.offset {
+                        IntOffset(0, yOffset.roundToPx())
+                    },
                     title = stringResource(R.string.about_launcher_title)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
                         ButtonIconItem(
-                            icon = painterResource(R.drawable.img_launcher),
+                            icon = painterResource(R.drawable.icon),
                             title = BuildKeys.LAUNCHER_NAME,
-                            text = stringResource(R.string.about_launcher_version, BuildConfig.VERSION_NAME),
+                            text = stringResource(
+                                R.string.about_launcher_version,
+                                BuildConfig.VERSION_NAME
+                            ),
                             button = {
-                                Button(
-                                    onClick = checkUpdate
-                                ) {
-                                    Text(text = stringResource(R.string.upgrade_title))
+                                Button(onClick = { openLink(RKB_WEBSITE) }) {
+                                    Text(stringResource(R.string.upgrade_title))
                                 }
-                                Button(
-                                    onClick = { openLink(URL_PROJECT) }
-                                ) {
-                                    Text(text = stringResource(R.string.about_launcher_project_link))
+                                Button(onClick = { openLink(RKB_WEBSITE) }) {
+                                    Text(stringResource(R.string.about_launcher_project_link))
                                 }
                             }
                         )
 
                         ButtonIconItem(
-    icon = painterResource(R.drawable.img_avatar_rkb),
-    title = "RKB GAMERZ",
-    text = "Author of ${BuildKeys.LAUNCHER_NAME}",
-    button = {
-        Button(
-            onClick = {
-                openLink("https://discord.gg/YMfD2GZvur")
-            }
-        ) {
-            Text("Discord")
-        }
-    }
-)
+                            icon = painterResource(R.drawable.img_avatar_rkb),
+                            title = "RKB GAMERZ",
+                            text = "Author of ${BuildKeys.LAUNCHER_NAME}",
+                            button = {
+                                Button(onClick = { openLink(RKB_DISCORD) }) {
+                                    Text("Discord")
+                                }
+                            }
+                        )
+
+                        ButtonIconItem(
+                            icon = painterResource(R.drawable.img_avatar_rkb),
+                            title = "RKB Community",
+                            text = "Official RKB Launcher community",
+                            button = {
+                                Button(onClick = { openLink(RKB_DISCORD) }) {
+                                    Text("Discord")
+                                }
+                            }
+                        )
+
+                        ButtonIconItem(
+                            icon = painterResource(R.drawable.img_avatar_rkb),
+                            title = "Community",
+                            text = "Join our Minecraft community",
+                            button = {
+                                Button(onClick = { openLink(COMMUNITY_DISCORD) }) {
+                                    Text("Discord")
+                                }
+                            }
+                        )
                     }
                 }
             }
 
             animatedItem(scope) { yOffset ->
                 ChunkLayout(
-                    modifier = Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) },
+                    modifier = Modifier.offset {
+                        IntOffset(0, yOffset.roundToPx())
+                    },
                     title = stringResource(R.string.about_acknowledgements_title)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
                         ButtonIconItem(
                             icon = painterResource(R.drawable.img_avatar_bangbang93),
                             title = "bangbang93",
-                            text = stringResource(R.string.about_acknowledgements_bangbang93_text, BuildKeys.LAUNCHER_SHORT_NAME),
+                            text = stringResource(
+                                R.string.about_acknowledgements_bangbang93_text,
+                                BuildKeys.LAUNCHER_SHORT_NAME
+                            ),
                             button = {
-                                Button(
-                                    onClick = { openLink("https://ifdian.net/a/bangbang93") }
-                                ) {
-                                    Text(text = stringResource(R.string.about_sponsor))
+                                Button(onClick = {
+                                    openLink("https://ifdian.net/a/bangbang93")
+                                }) {
+                                    Text(stringResource(R.string.about_sponsor))
                                 }
                             }
                         )
+
                         LinkIconItem(
                             icon = painterResource(R.drawable.img_launcher_fcl),
                             title = "Fold Craft Launcher",
-                            text = stringResource(R.string.about_acknowledgements_fcl_text, BuildKeys.LAUNCHER_SHORT_NAME),
+                            text = stringResource(
+                                R.string.about_acknowledgements_fcl_text,
+                                BuildKeys.LAUNCHER_SHORT_NAME
+                            ),
                             openLicense = { openLicense(R.raw.fcl_license) },
-                            openLink = { openLink("https://github.com/FCL-Team/FoldCraftLauncher") }
+                            openLink = {
+                                openLink("https://github.com/FCL-Team/FoldCraftLauncher")
+                            }
                         )
+
                         LinkIconItem(
                             icon = painterResource(R.drawable.img_launcher_hmcl),
                             title = "Hello Minecraft! Launcher",
-                            text = stringResource(R.string.about_acknowledgements_hmcl_text, BuildKeys.LAUNCHER_SHORT_NAME),
+                            text = stringResource(
+                                R.string.about_acknowledgements_hmcl_text,
+                                BuildKeys.LAUNCHER_SHORT_NAME
+                            ),
                             openLicense = { openLicense(R.raw.hmcl_license) },
-                            openLink = { openLink("https://github.com/HMCL-dev/HMCL") }
+                            openLink = {
+                                openLink("https://github.com/HMCL-dev/HMCL")
+                            }
                         )
+
                         LinkIconItem(
                             icon = painterResource(R.drawable.img_platform_mcmod),
                             title = stringResource(R.string.about_acknowledgements_mcmod),
-                            text = stringResource(R.string.about_acknowledgements_mcmod_text, BuildKeys.LAUNCHER_SHORT_NAME),
+                            text = stringResource(
+                                R.string.about_acknowledgements_mcmod_text,
+                                BuildKeys.LAUNCHER_SHORT_NAME
+                            ),
                             openLink = { openLink(URL_MCMOD) }
                         )
+
                         ButtonIconItem(
                             icon = painterResource(R.drawable.img_avatar_mcim),
                             title = "mcmod-info-mirror",
-                            text = stringResource(R.string.about_acknowledgements_mcim_text, BuildKeys.LAUNCHER_SHORT_NAME),
+                            text = stringResource(
+                                R.string.about_acknowledgements_mcim_text,
+                                BuildKeys.LAUNCHER_SHORT_NAME
+                            ),
                             button = {
-                                Button(
-                                    onClick = { openLink("https://www.mcimirror.top/sponsor") }
-                                ) {
-                                    Text(text = stringResource(R.string.about_sponsor))
+                                Button(onClick = {
+                                    openLink("https://www.mcimirror.top/sponsor")
+                                }) {
+                                    Text(stringResource(R.string.about_sponsor))
                                 }
                             }
                         )
+
                         LinkIconItem(
                             icon = painterResource(R.drawable.img_launcher_pcl2),
                             title = "Plain Craft Launcher 2",
-                            text = stringResource(R.string.about_acknowledgements_pcl_text, BuildKeys.LAUNCHER_SHORT_NAME),
-                            openLink = { openLink("https://github.com/Meloong-Git/PCL") }
+                            text = stringResource(
+                                R.string.about_acknowledgements_pcl_text,
+                                BuildKeys.LAUNCHER_SHORT_NAME
+                            ),
+                            openLink = {
+                                openLink("https://github.com/Meloong-Git/PCL")
+                            }
                         )
+
                         LinkIconItem(
                             icon = painterResource(R.drawable.img_launcher_pojav),
                             title = "PojavLauncher",
-                            text = stringResource(R.string.about_acknowledgements_pojav_text, BuildKeys.LAUNCHER_SHORT_NAME),
+                            text = stringResource(
+                                R.string.about_acknowledgements_pojav_text,
+                                BuildKeys.LAUNCHER_SHORT_NAME
+                            ),
                             openLicense = { openLicense(R.raw.lgpl_3_license) },
-                            openLink = { openLink("https://github.com/PojavLauncherTeam/PojavLauncher") }
+                            openLink = {
+                                openLink("https://github.com/PojavLauncherTeam/PojavLauncher")
+                            }
                         )
+
                         LinkIconItem(
                             icon = painterResource(R.drawable.ic_github),
                             title = stringResource(R.string.about_acknowledgements_github_community),
@@ -208,6 +271,7 @@ fun AboutInfoScreen(
                             openLink = { openLink(URL_COMMUNITY) },
                             useImage = false
                         )
+
                         LinkIconItem(
                             icon = painterResource(R.drawable.img_platform_weblate),
                             title = stringResource(R.string.about_acknowledgements_weblate_community),
@@ -218,25 +282,31 @@ fun AboutInfoScreen(
                 }
             }
 
-            //额外依赖库板块
             animatedItem(scope) { yOffset ->
                 ChunkLayout(
-                    modifier = Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) },
+                    modifier = Modifier.offset {
+                        IntOffset(0, yOffset.roundToPx())
+                    },
                     title = stringResource(R.string.about_library_title)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         libraryData.forEach { info ->
-                            LibraryInfoItem(info = info, openLicense = openLicense, openLink = openLink)
+                            LibraryInfoItem(
+                                info = info,
+                                openLicense = openLicense,
+                                openLink = openLink
+                            )
                         }
                     }
                 }
             }
 
-            //已加载插件板块
             PluginLoader.allPlugins.takeIf { it.isNotEmpty() }?.let { allPlugins ->
                 animatedItem(scope) { yOffset ->
                     ChunkLayout(
-                        modifier = Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) },
+                        modifier = Modifier.offset {
+                            IntOffset(0, yOffset.roundToPx())
+                        },
                         title = stringResource(R.string.about_plugin_title)
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -309,7 +379,8 @@ private fun LinkIconItem(
         ) {
             val iconModifier = Modifier
                 .size(34.dp)
-                .clip(shape = RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(6.dp))
+
             if (useImage) {
                 Image(
                     modifier = iconModifier,
@@ -325,9 +396,7 @@ private fun LinkIconItem(
                 )
             }
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall
@@ -341,9 +410,7 @@ private fun LinkIconItem(
 
             Row {
                 openLicense?.let {
-                    IconButton(
-                        onClick = it
-                    ) {
+                    IconButton(onClick = it) {
                         Icon(
                             modifier = Modifier.size(22.dp),
                             painter = painterResource(R.drawable.ic_copyright_outlined),
@@ -352,9 +419,7 @@ private fun LinkIconItem(
                     }
                 }
                 openLink?.let {
-                    IconButton(
-                        onClick = it
-                    ) {
+                    IconButton(onClick = it) {
                         Icon(
                             painter = painterResource(R.drawable.ic_link),
                             contentDescription = stringResource(R.string.generic_open_link)
@@ -374,7 +439,7 @@ private fun ButtonIconItem(
     text: String,
     button: @Composable RowScope.() -> Unit,
     color: Color = itemColor(),
-    contentColor: Color = onItemColor(),
+    contentColor: Color = onItemColor()
 ) {
     Surface(
         modifier = modifier,
@@ -393,15 +458,13 @@ private fun ButtonIconItem(
             Image(
                 modifier = Modifier
                     .size(34.dp)
-                    .clip(shape = RoundedCornerShape(6.dp)),
+                    .clip(RoundedCornerShape(6.dp)),
                 painter = icon,
                 contentDescription = null,
                 contentScale = ContentScale.Fit
             )
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall
@@ -423,7 +486,7 @@ private fun PluginInfoItem(
     apkPlugin: ApkPlugin,
     modifier: Modifier = Modifier,
     color: Color = itemColor(),
-    contentColor: Color = onItemColor(),
+    contentColor: Color = onItemColor()
 ) {
     Surface(
         modifier = modifier,
@@ -433,13 +496,14 @@ private fun PluginInfoItem(
         onClick = {}
     ) {
         val context = LocalContext.current
+        val iconFile = appCacheIcon(apkPlugin.packageName)
+
         Row(
             modifier = Modifier
                 .padding(all = 12.dp)
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val iconFile = appCacheIcon(apkPlugin.packageName)
             if (iconFile.exists()) {
                 val model = remember(context, iconFile) {
                     ImageRequest.Builder(context)
@@ -449,7 +513,7 @@ private fun PluginInfoItem(
                 AsyncImage(
                     modifier = Modifier
                         .size(34.dp)
-                        .clip(shape = RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(8.dp)),
                     model = model,
                     contentDescription = null,
                     contentScale = ContentScale.Fit
@@ -463,9 +527,7 @@ private fun PluginInfoItem(
                 )
             }
 
-            Column(
-                modifier = Modifier.align(Alignment.CenterVertically)
-            ) {
+            Column(modifier = Modifier.align(Alignment.CenterVertically)) {
                 Text(
                     text = apkPlugin.appName,
                     style = MaterialTheme.typography.titleSmall
@@ -519,9 +581,7 @@ private fun LibraryInfoItem(
                     text = info.name,
                     style = MaterialTheme.typography.titleSmall
                 )
-                Column(
-                    modifier = Modifier.alpha(0.7f)
-                ) {
+                Column(modifier = Modifier.alpha(0.7f)) {
                     info.copyrightInfo?.let { copyrightInfo ->
                         Text(
                             text = copyrightInfo,
@@ -529,11 +589,9 @@ private fun LibraryInfoItem(
                         )
                     }
                     Text(
-                        modifier = Modifier.clickable(
-                            onClick = {
-                                openLicense(info.license.raw)
-                            }
-                        ),
+                        modifier = Modifier.clickable {
+                            openLicense(info.license.raw)
+                        },
                         text = "Licensed under the ${info.license.name}",
                         style = MaterialTheme.typography.bodySmall.copy(
                             textDecoration = TextDecoration.Underline
@@ -541,11 +599,10 @@ private fun LibraryInfoItem(
                     )
                 }
             }
+
             IconButton(
                 modifier = Modifier.align(Alignment.CenterVertically),
-                onClick = {
-                    openLink(info.webUrl)
-                }
+                onClick = { openLink(info.webUrl) }
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_link),
