@@ -54,6 +54,7 @@ fun GlassCard(
     elevation: Dp = 12.dp,
     borderBrush: Brush = Brush.linearGradient(RkbGradients.cardBorder),
     onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
     contentPadding: Dp = 20.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -83,6 +84,7 @@ fun GlassCard(
         base.clickable(
             interactionSource = interactionSource,
             indication = ripple(color = ext.accentBlue),
+            enabled = enabled,
             onClick = onClick,
         )
     } else base
