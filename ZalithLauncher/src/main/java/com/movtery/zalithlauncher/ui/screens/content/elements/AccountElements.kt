@@ -1174,9 +1174,10 @@ fun ChangeSkinDialog(
     onSkinPicked: (Uri) -> Unit,
     onDismissRequest: () -> Unit,
     onResetSkin: () -> Unit,
-    onApplySkin: (File, SkinModelType) -> Unit,
-    onApplyCape: (PlayerProfile.Cape) -> Unit,
-    onFetchCapes: () -> Unit
+onApplySkin: (File, SkinModelType) -> Unit,
+onApplyCape: (PlayerProfile.Cape) -> Unit,
+onFetchCapes: () -> Unit,
+onSaveSkinUrl: (String) -> Unit
 ) {
     val context = LocalContext.current
     val playerSkin = remember { PlayerSkin(context) }
