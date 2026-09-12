@@ -59,8 +59,16 @@ data class Account(
     var otherAccount: String? = null,
     var otherPassword: String? = null,
     var accountType: String? = null,
-    var skinModelType: SkinModelType = SkinModelType.NONE
+    var skinModelType: SkinModelType = SkinModelType.NONE,
+
+    /**
+     * RKB Launcher Skin URL
+     *
+     * SkinsRestorer-compatible direct skin URL.
+     */
+    var skinUrl: String? = null
 ): Parcelable {
+
     val hasSkinFile: Boolean
         get() = getSkinFile().exists()
 
@@ -68,8 +76,11 @@ data class Account(
 
     fun getCapeFile() = File(PathManager.DIR_ACCOUNT_CAPE, "$uniqueUUID.png")
 
-    private fun getTempSkinFile() = File(PathManager.DIR_CACHE, "account_skin_${uniqueUUID}.tmp.png")
-    private fun getTempCapeFile() = File(PathManager.DIR_CACHE, "account_cape_${uniqueUUID}.tmp.png")
+    private fun getTempSkinFile() =
+        File(PathManager.DIR_CACHE, "account_skin_${uniqueUUID}.tmp.png")
+
+    private fun getTempCapeFile() =
+        File(PathManager.DIR_CACHE, "account_cape_${uniqueUUID}.tmp.png")
 
     /**
      * 下载并更新账号的皮肤文件
@@ -80,6 +91,7 @@ data class Account(
             isAuthServerAccount() -> otherBaseUrl!!.removeSuffix("/") + "/sessionserver/"
             else -> null
         }
+
         baseUrl?.let { url ->
             val skinJob = async { updateSkin(url) }
             val capeJob = async { updateCape(url) }
@@ -94,11 +106,17 @@ data class Account(
 
         runCatching {
             FileUtils.deleteQuietly(tempFile)
+
             SkinFileDownloader().download(url, tempFile, profileId) { modelType ->
                 this.skinModelType = modelType
             }
-            if (targetFile.exists()) FileUtils.deleteQuietly(targetFile)
+
+            if (targetFile.exists()) {
+                FileUtils.deleteQuietly(targetFile)
+            }
+
             FileUtils.moveFile(tempFile, targetFile)
+
             Logger.info(TAG, "Update skin success")
         }.onFailure { e ->
             Logger.error(TAG, "Could not update skin", e)
@@ -112,9 +130,15 @@ data class Account(
 
         runCatching {
             FileUtils.deleteQuietly(tempFile)
+
             CapeFileDownloader().download(url, tempFile, profileId)
-            if (targetFile.exists()) FileUtils.deleteQuietly(targetFile)
+
+            if (targetFile.exists()) {
+                FileUtils.deleteQuietly(targetFile)
+            }
+
             FileUtils.moveFile(tempFile, targetFile)
+
             Logger.info(TAG, "Update cape success")
         }.onFailure { e ->
             Logger.error(TAG, "Could not update cape", e)
