@@ -33,7 +33,11 @@ import com.movtery.zalithlauncher.game.path.GamePath
 import com.movtery.zalithlauncher.game.path.GamePathDao
 
 @Database(
-    entities = [Account::class, AuthServer::class, GamePath::class],
+    entities = [
+        Account::class,
+        AuthServer::class,
+        GamePath::class
+    ],
     version = 3,
     exportSchema = false
 )
@@ -56,13 +60,15 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun gamePathDao(): GamePathDao
 
     companion object {
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
-                    "ALTER TABLE accounts ADD COLUMN expiresAt INTEGER NOT NULL DEFAULT 0"
+                    "ALTER TABLE accounts " +
+                    "ADD COLUMN expiresAt INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }
@@ -70,7 +76,8 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
-                    "ALTER TABLE accounts ADD COLUMN skinUrl TEXT"
+                    "ALTER TABLE accounts " +
+                    "ADD COLUMN skinUrl TEXT"
                 )
             }
         }
@@ -80,6 +87,7 @@ abstract class AppDatabase : RoomDatabase() {
          */
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
