@@ -836,7 +836,10 @@ private fun AccountSkinOperation(
                     account.skinUrl = url
                     AccountsManager.saveAccount(account)
                 }
-            )
+             )
+        }
+    }
+}
 
 /**
  * 通用账号管理操作逻辑处理（如删除确认）
