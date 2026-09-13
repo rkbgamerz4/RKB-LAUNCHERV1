@@ -801,24 +801,42 @@ private fun AccountSkinOperation(
                 },
                 onDismissRequest = {
                     actions.onIntent(AccountManageIntent.ResetAccountSkinDialogState)
-                    actions.onIntent(AccountManageIntent.UpdateAccountSkinOp(AccountSkinOperation.None))
+                    actions.onIntent(
+                        AccountManageIntent.UpdateAccountSkinOp(
+                            AccountSkinOperation.None
+                        )
+                    )
                 },
                 onResetSkin = {
                     actions.onIntent(AccountManageIntent.ResetSkin(account))
                 },
                 onFetchCapes = {
-                    actions.onIntent(AccountManageIntent.FetchMicrosoftCapes(account))
+                    actions.onIntent(
+                        AccountManageIntent.FetchMicrosoftCapes(account)
+                    )
                 },
                 onApplySkin = { file, model ->
-                    actions.onIntent(AccountManageIntent.ApplySkin(account, file, model))
+                    actions.onIntent(
+                        AccountManageIntent.ApplySkin(
+                            account,
+                            file,
+                            model
+                        )
+                    )
                 },
                 onApplyCape = { cape ->
-                    actions.onIntent(AccountManageIntent.ApplyMicrosoftCape(account, cape))
+                    actions.onIntent(
+                        AccountManageIntent.ApplyMicrosoftCape(
+                            account,
+                            cape
+                        )
+                    )
+                },
+                onSaveSkinUrl = { url ->
+                    account.skinUrl = url
+                    AccountsManager.saveAccount(account)
                 }
             )
-        }
-    }
-}
 
 /**
  * 通用账号管理操作逻辑处理（如删除确认）
