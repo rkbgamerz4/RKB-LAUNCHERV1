@@ -1190,6 +1190,15 @@ onSaveSkinUrl: (String) -> Unit
 
     var showCapeSelector by remember { mutableStateOf(false) }
 
+    // RKB Launcher Skin URL setup
+    var showSkinUrl by rememberSaveable(account.uniqueUUID) {
+        mutableStateOf(account.skinUrl.isNullOrBlank())
+    }
+    var skinUrlInput by rememberSaveable(account.uniqueUUID) {
+        mutableStateOf(account.skinUrl.orEmpty())
+    }
+    var skinUrlError by remember { mutableStateOf(false) }
+
     var isFetchingCapes by remember { mutableStateOf(false) }
 
     var currentCapeToLoad by remember { mutableStateOf(EmptyCape) }
@@ -1325,8 +1334,73 @@ onSaveSkinUrl: (String) -> Unit
                                 .verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            //更换皮肤：选择皮肤图片文件
-                            when (skinState) {
+                            if (showSkinUrl) {
+                                Text(
+                                    text = "Skin URL",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+
+                                Text(
+                                    text = "Paste your SkinsRestorer skin URL.",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+
+                                OwnOutlinedTextField(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    value = skinUrlInput,
+                                    onValueChange = {
+                                        skinUrlInput = it
+                                        skinUrlError = false
+                                    },
+                                    isError = skinUrlError,
+                                    label = { Text(text = "Skin URL") },
+                                    supportingText = {
+                                        if (skinUrlError) {
+                                            Text(text = "Enter a valid https:// skin URL")
+                                        }
+                                    },
+                                    singleLine = true,
+                                    shape = MaterialTheme.shapes.large,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Uri
+                                    )
+                                )
+
+                                Button(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        val url = skinUrlInput.trim()
+                                        skinUrlError = !url.startsWith("https://")
+
+                                        if (!skinUrlError) {
+                                            onSaveSkinUrl(url)
+                                            showSkinUrl = false
+                                        }
+                                    }
+                                ) {
+                                    Text(text = "NEXT")
+                                }
+                            } else {
+                                // RKB Launcher: edit saved Skin URL
+                                InfoLayoutTextItem(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    title = "Skin URL",
+                                    icon = {
+                                        Icon(
+                                            modifier = Modifier.size(22.dp),
+                                            painter = painterResource(R.drawable.ic_link),
+                                            contentDescription = null
+                                        )
+                                    },
+                                    onClick = {
+                                        skinUrlInput = account.skinUrl.orEmpty()
+                                        skinUrlError = false
+                                        showSkinUrl = true
+                                    }
+                                )
+
+                                //更换皮肤：选择皮肤图片文件
+                                when (skinState) {
                                 ChangeSkin.None, ChangeSkin.ResetSkin -> {
                                     InfoLayoutTextItem(
                                         modifier = Modifier.fillMaxWidth(),
@@ -1395,8 +1469,10 @@ onSaveSkinUrl: (String) -> Unit
                                 }
                             }
 
-                            //仅微软账号支持更改披风
-                            if (account.isMicrosoftAccount()) {
+                                }
+
+                                //仅微软账号支持更改披风
+                                if (account.isMicrosoftAccount()) {
                                 InfoLayoutTextItem(
                                     modifier = Modifier.fillMaxWidth(),
                                     title = if (isFetchingCapes) {
