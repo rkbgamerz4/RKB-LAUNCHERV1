@@ -73,10 +73,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Generate debug keystore
+      - name: Remove old debug keystore
         run: |
           rm -f app_pojavlauncher/debug.keystore
+          rm -f app_pojavlauncher/debug.keystore.bak
 
+      - name: Generate fresh debug keystore
+        run: |
           keytool -genkeypair \
             -v \
             -keystore app_pojavlauncher/debug.keystore \
@@ -88,11 +91,37 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
+          echo "Generated keystore:"
+          keytool -list \
+            -keystore app_pojavlauncher/debug.keystore \
+            -storepass android
+
+      - name: Clean Gradle build
+        run: |
+          ./gradlew :app_pojavlauncher:clean --no-daemon
+
+      - name: Verify debug keystore
+        run: |
+          echo "Checking debug keystore before APK build..."
+          ls -lh app_pojavlauncher/debug.keystore
+
+          keytool -list \
+            -v \
+            -keystore app_pojavlauncher/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey
+
       - name: Build Debug APK
         run: |
           mkdir -p out
-          ./gradlew :app_pojavlauncher:assembleDebug --no-daemon
-          cp app_pojavlauncher/build/outputs/apk/debug/*.apk out/RKBLauncher-debug.apk
+
+          ./gradlew \
+            :app_pojavlauncher:assembleDebug \
+            --no-daemon \
+            --no-build-cache
+
+          cp app_pojavlauncher/build/outputs/apk/debug/*.apk \
+            out/RKBLauncher-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
