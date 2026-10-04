@@ -78,11 +78,12 @@ jobs:
           rm -f app_pojavlauncher/debug.keystore
           rm -f app_pojavlauncher/debug.keystore.bak
 
-      - name: Generate fresh debug keystore
+      - name: Generate fresh JKS debug keystore
         run: |
           keytool -genkeypair \
             -v \
             -keystore app_pojavlauncher/debug.keystore \
+            -storetype JKS \
             -storepass android \
             -alias androiddebugkey \
             -keypass android \
@@ -91,25 +92,22 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
-          echo "Generated keystore:"
-          keytool -list \
-            -keystore app_pojavlauncher/debug.keystore \
-            -storepass android
-
-      - name: Clean Gradle build
-        run: |
-          ./gradlew :app_pojavlauncher:clean --no-daemon
-
       - name: Verify debug keystore
         run: |
-          echo "Checking debug keystore before APK build..."
+          echo "Checking debug keystore..."
+          file app_pojavlauncher/debug.keystore
           ls -lh app_pojavlauncher/debug.keystore
 
           keytool -list \
             -v \
             -keystore app_pojavlauncher/debug.keystore \
+            -storetype JKS \
             -storepass android \
             -alias androiddebugkey
+
+      - name: Clean Gradle build
+        run: |
+          ./gradlew :app_pojavlauncher:clean --no-daemon
 
       - name: Build Debug APK
         run: |
@@ -122,6 +120,11 @@ jobs:
 
           cp app_pojavlauncher/build/outputs/apk/debug/*.apk \
             out/RKBLauncher-debug.apk
+
+      - name: Verify APK
+        run: |
+          ls -lh out/RKBLauncher-debug.apk
+          file out/RKBLauncher-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
