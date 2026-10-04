@@ -75,6 +75,8 @@ jobs:
 
       - name: Generate debug keystore
         run: |
+          rm -f app_pojavlauncher/debug.keystore
+
           keytool -genkeypair \
             -v \
             -keystore app_pojavlauncher/debug.keystore \
