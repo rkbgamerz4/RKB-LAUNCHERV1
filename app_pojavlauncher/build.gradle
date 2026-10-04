@@ -279,7 +279,6 @@ dependencies {
     implementation files('libs/exp4j-0.4.9-SNAPSHOT.jar')
     implementation files('libs/ExagearApacheCommons.jar')
 
-
     // =========================================================
     // Maven dependencies
     // =========================================================
@@ -287,19 +286,7 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'org.apache.commons:commons-compress:1.26.1'
 
-
-    // =========================================================
-    // NOTE
-    //
-    // commons-io:commons-io:2.15.1
-    // intentionally removed.
-    //
-    // commons-io-2.15.1.jar
-    // intentionally removed.
-    //
-    // fileTree(libs)
-    // intentionally removed.
-    //
-    // ExagearApacheCommons.jar contains Apache Commons classes.
-    // =========================================================
+    // Do NOT add commons-io here.
+    // ExagearApacheCommons.jar already contains Commons IO.
+    // Do NOT use fileTree() because it creates duplicate dependencies.
 }
