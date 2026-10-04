@@ -221,6 +221,7 @@ afterEvaluate {
 }
 
 configurations.all {    exclude group: 'commons-io', module: 'commons-io'    exclude group: 'org.apache.commons', module: 'commons-lang3'}
+exclude group: 'org.apache.commons', module: 'commons-compress'
 dependencies {
 
     // =========================================================
@@ -276,7 +277,6 @@ dependencies {
     // =========================================================
 
     implementation files('libs/gson-2.8.6.jar')
-    implementation files('libs/commons-compress-1.26.1.jar')
     implementation files('libs/exp4j-0.4.9-SNAPSHOT.jar')
     implementation files('libs/ExagearApacheCommons.jar')
 
@@ -285,7 +285,6 @@ dependencies {
     // =========================================================
 
     implementation 'com.google.code.gson:gson:2.10.1'
-    implementation 'org.apache.commons:commons-compress:1.26.1'
 
     // Do NOT add commons-io here.
     // ExagearApacheCommons.jar already contains Commons IO.
