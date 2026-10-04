@@ -78,7 +78,7 @@ jobs:
           rm -f app_pojavlauncher/debug.keystore
           rm -f app_pojavlauncher/debug.keystore.bak
 
-      - name: Generate fresh JKS debug keystore
+      - name: Generate debug keystore
         run: |
           keytool -genkeypair \
             -v \
@@ -86,7 +86,7 @@ jobs:
             -storetype JKS \
             -storepass android \
             -alias androiddebugkey \
-            -keypass android \
+            -keypass androiddebugkey \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
@@ -94,16 +94,23 @@ jobs:
 
       - name: Verify debug keystore
         run: |
-          echo "Checking debug keystore..."
+          echo "=== Keystore ==="
           file app_pojavlauncher/debug.keystore
           ls -lh app_pojavlauncher/debug.keystore
 
+          echo "=== Key list ==="
           keytool -list \
-            -v \
+            -keystore app_pojavlauncher/debug.keystore \
+            -storetype JKS \
+            -storepass android
+
+          echo "=== Key verification ==="
+          keytool -list \
             -keystore app_pojavlauncher/debug.keystore \
             -storetype JKS \
             -storepass android \
-            -alias androiddebugkey
+            -alias androiddebugkey \
+            -keypass androiddebugkey
 
       - name: Clean Gradle build
         run: |
