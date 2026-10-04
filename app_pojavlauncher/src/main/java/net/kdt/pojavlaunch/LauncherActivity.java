@@ -130,16 +130,15 @@ public class LauncherActivity extends BaseActivity {
         String normalizedVersionId = AsyncMinecraftDownloader.normalizeVersionId(prof.lastVersionId);
         JMinecraftVersionList.Version mcVersion = AsyncMinecraftDownloader.getListedVersion(normalizedVersionId);
 
-        // Do not load when is a modded version or older than minecraft 1.3 on demo account
+        // Only true Mojang Demo accounts (username starts with "Demo.") are restricted.
+        // Local / offline accounts (e.g. RKB_GAMERZ) must always be allowed to play.
         if (mAccountSpinner.getSelectedAccount().isDemo()) {
             boolean isOlderThan13 = true;
-
             if (mcVersion != null) {
                 try {
                     isOlderThan13 = DateUtils.dateBefore(DateUtils.parseReleaseDate(mcVersion.releaseTime), 2012, 6, 22);
                 } catch (ParseException ignored) {}
             }
-
             if (isOlderThan13) {
                 Toast.makeText(this, R.string.toast_not_available_demo, Toast.LENGTH_LONG).show();
                 return false;

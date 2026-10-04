@@ -42,7 +42,8 @@ public class ProfileTypeSelectFragment extends Fragment {
     }
 
     private void tryInstall(Class<? extends Fragment> fragmentClass, String tag){
-        if(Tools.isLocalProfile(requireContext()) || Tools.isDemoProfile(requireContext())){
+        // Only block true Mojang Demo accounts — local/offline OK
+        if(Tools.isDemoProfile(requireContext())){
             Toast.makeText(requireContext(), R.string.toast_not_available_demo, Toast.LENGTH_LONG).show();
         } else {
             Tools.swapFragment(requireActivity(), fragmentClass, tag, null);

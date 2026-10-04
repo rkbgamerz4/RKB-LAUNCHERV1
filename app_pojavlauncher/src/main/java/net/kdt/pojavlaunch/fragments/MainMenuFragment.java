@@ -23,6 +23,8 @@ import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
+import net.kdt.pojavlaunch.rkb.discord.DiscordRPC;
+import net.kdt.pojavlaunch.rkb.ui.ModManagerFragment;
 import net.kdt.pojavlaunch.value.launcherprofiles.LauncherProfiles;
 import net.kdt.pojavlaunch.value.launcherprofiles.MinecraftProfile;
 
@@ -45,13 +47,21 @@ public class MainMenuFragment extends Fragment {
         Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
         Button mShareLogsButton = view.findViewById(R.id.share_logs_button);
         Button mOpenDirectoryButton = view.findViewById(R.id.open_files_button);
+        Button mModManagerButton = view.findViewById(R.id.mod_manager_button);
 
         ImageButton mEditProfileButton = view.findViewById(R.id.edit_profile_button);
         Button mPlayButton = view.findViewById(R.id.play_button);
         mVersionSpinner = view.findViewById(R.id.mc_version_spinner);
 
         mNewsButton.setOnClickListener(v -> Tools.openURL(requireActivity(), Tools.URL_HOME));
-        mDiscordButton.setOnClickListener(v -> Tools.openURL(requireActivity(), getString(R.string.discord_invite)));
+        // Discord: if linked → invite; else → OAuth link for Rich Presence
+        mDiscordButton.setOnClickListener(v -> {
+            if (DiscordRPC.isLinked(requireContext())) {
+                Tools.openURL(requireActivity(), getString(R.string.discord_invite));
+            } else {
+                DiscordRPC.startLink(requireContext());
+            }
+        });
         mCustomControlButton.setOnClickListener(v -> startActivity(new Intent(requireContext(), CustomControlsActivity.class)));
         mInstallJarButton.setOnClickListener(v -> runInstallerWithConfirmation(false));
         mInstallJarButton.setOnLongClickListener(v->{
@@ -65,15 +75,19 @@ public class MainMenuFragment extends Fragment {
         mShareLogsButton.setOnClickListener((v) -> shareLog(requireContext()));
 
         mOpenDirectoryButton.setOnClickListener((v)-> {
-            Tools.switchDemo(Tools.isDemoProfile(v.getContext())); // avoid switching accounts being able to access
+            // Only block real Mojang Demo accounts, not local/offline
             if(Tools.isDemoProfile(v.getContext())){
                 Toast.makeText(v.getContext(), R.string.toast_not_available_demo, Toast.LENGTH_LONG).show();
                 return;
             }
-
+            Tools.switchDemo(false);
             openPath(v.getContext(), getCurrentProfileDirectory(), false);
         });
 
+        if (mModManagerButton != null) {
+            mModManagerButton.setOnClickListener(v ->
+                    Tools.swapFragment(requireActivity(), ModManagerFragment.class, ModManagerFragment.TAG, null));
+        }
 
         mNewsButton.setOnLongClickListener((v)->{
             Tools.swapFragment(requireActivity(), GamepadMapperFragment.class, GamepadMapperFragment.TAG, null);
@@ -97,8 +111,8 @@ public class MainMenuFragment extends Fragment {
     }
 
     private void runInstallerWithConfirmation(boolean isCustomArgs) {
-        // avoid using custom installers to install a version
-        if(Tools.isLocalProfile(requireContext()) || Tools.isDemoProfile(requireContext())){
+        // Only block true Demo accounts — local/offline can install
+        if(Tools.isDemoProfile(requireContext())){
             Toast.makeText(requireContext(), R.string.toast_not_available_demo, Toast.LENGTH_LONG).show();
             return;
         }
