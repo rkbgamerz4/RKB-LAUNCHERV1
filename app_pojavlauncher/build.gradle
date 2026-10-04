@@ -213,15 +213,21 @@ android {
 }
 
 afterEvaluate {
-    tasks.mergeDebugAssets.dependsOn(
-            ":forge_installer:jar",
-            ":arc_dns_injector:jar",
-            ":jre_lwjgl3glfw:jar"
-    )
+    tasks.matching { it.name == "mergeDebugAssets" }.configureEach {
+        dependsOn(
+                ":forge_installer:jar",
+                ":arc_dns_injector:jar",
+                ":jre_lwjgl3glfw:jar"
+        )
+    }
 }
 
-configurations.all {    exclude group: 'commons-io', module: 'commons-io'    exclude group: 'org.apache.commons', module: 'commons-lang3'}
-exclude group: 'org.apache.commons', module: 'commons-compress'
+configurations.all {
+    exclude group: 'commons-io', module: 'commons-io'
+    exclude group: 'org.apache.commons', module: 'commons-lang3'
+    exclude group: 'org.apache.commons', module: 'commons-compress'
+}
+
 dependencies {
 
     // =========================================================
@@ -279,6 +285,7 @@ dependencies {
     implementation files('libs/gson-2.8.6.jar')
     implementation files('libs/exp4j-0.4.9-SNAPSHOT.jar')
     implementation files('libs/ExagearApacheCommons.jar')
+
 
     // =========================================================
     // Maven dependencies
