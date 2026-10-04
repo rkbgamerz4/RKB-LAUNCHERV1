@@ -220,6 +220,7 @@ afterEvaluate {
     )
 }
 
+configurations.all {    exclude group: 'commons-io', module: 'commons-io'    exclude group: 'org.apache.commons', module: 'commons-lang3'}
 dependencies {
 
     // =========================================================
