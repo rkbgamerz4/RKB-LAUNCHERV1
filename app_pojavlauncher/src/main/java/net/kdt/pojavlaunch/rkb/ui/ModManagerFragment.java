@@ -241,4 +241,5 @@ public class ModManagerFragment extends Fragment {
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
+
 }
