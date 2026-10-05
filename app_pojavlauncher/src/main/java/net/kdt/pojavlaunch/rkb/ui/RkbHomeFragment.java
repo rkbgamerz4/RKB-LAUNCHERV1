@@ -92,15 +92,19 @@ public class RkbHomeFragment extends Fragment {
         LinearLayout.LayoutParams flexLp = new LinearLayout.LayoutParams(1, 0, 1f);
         sideNav.addView(flex, flexLp);
 
-        // Settings – FIXED package
+        // Settings – no hard class reference (safe compile)
         sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_preferences, false, v -> {
             try {
-                Tools.swapFragment(requireActivity(),
-                        net.kdt.pojavlaunch.prefs.LauncherPreferenceFragment.class,
-                        "SETTINGS", null);
-            } catch (Exception e) {
-                Toast.makeText(ctx, "Settings", Toast.LENGTH_SHORT).show();
-            }
+                int id = getResources().getIdentifier("setting_button", "id", requireContext().getPackageName());
+                if (id != 0) {
+                    View settingsBtn = requireActivity().findViewById(id);
+                    if (settingsBtn != null) {
+                        settingsBtn.performClick();
+                        return;
+                    }
+                }
+            } catch (Exception ignored) {}
+            Toast.makeText(ctx, "Settings", Toast.LENGTH_SHORT).show();
         }));
 
         root.addView(sideNav);
