@@ -1,6 +1,7 @@
 package net.kdt.pojavlaunch;
 
 import net.kdt.pojavlaunch.rkb.discord.DiscordRPC;
+import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
 
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import android.Manifest;
@@ -73,8 +74,9 @@ public class LauncherActivity extends BaseActivity {
     private final FragmentManager.FragmentLifecycleCallbacks mFragmentCallbackListener = new FragmentManager.FragmentLifecycleCallbacks() {
         @Override
         public void onFragmentResumed(@NonNull FragmentManager fm, @NonNull Fragment f) {
-            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(), f instanceof MainMenuFragment
-                    ? R.drawable.ic_menu_settings : R.drawable.ic_menu_home));
+            boolean isHome = f instanceof MainMenuFragment || f instanceof RkbHomeFragment;
+            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(),
+                    isHome ? R.drawable.ic_menu_settings : R.drawable.ic_menu_home));
         }
     };
 
@@ -87,8 +89,8 @@ public class LauncherActivity extends BaseActivity {
     /* Listener for the auth method selection screen */
     private final ExtraListener<Boolean> mSelectAuthMethod = (key, value) -> {
         Fragment fragment = getSupportFragmentManager().findFragmentById(mFragmentView.getId());
-        // Allow starting the add account only from the main menu, should it be moved to fragment itself ?
-        if(!(fragment instanceof MainMenuFragment)) return false;
+        // Allow starting the add account only from the main menu / RKB home
+        if(!(fragment instanceof MainMenuFragment) && !(fragment instanceof RkbHomeFragment)) return false;
 
         Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
         return false;
@@ -97,7 +99,7 @@ public class LauncherActivity extends BaseActivity {
     /* Listener for the settings fragment */
     private final View.OnClickListener mSettingButtonListener = v -> {
         Fragment fragment = getSupportFragmentManager().findFragmentById(mFragmentView.getId());
-        if(fragment instanceof MainMenuFragment){
+        if(fragment instanceof MainMenuFragment || fragment instanceof RkbHomeFragment){
             Tools.swapFragment(this, LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG, null);
         } else{
             // The setting button doubles as a home button now
@@ -186,13 +188,11 @@ public class LauncherActivity extends BaseActivity {
         FragmentManager fragmentManager = getSupportFragmentManager();
         // If we don't have a back stack root yet...
         if(fragmentManager.getBackStackEntryCount() < 1) {
-            // Manually add the first fragment to the backstack to get easily back to it
-            // There must be a better way to handle the root though...
-            // (artDev: No, there is not. I've spent days researching this for another unrelated project.)
+            // RKB Home (CS-style) as root instead of stock MainMenuFragment
             fragmentManager.beginTransaction()
                     .setReorderingAllowed(true)
                     .addToBackStack("ROOT")
-                    .add(R.id.container_fragment, MainMenuFragment.class, null, "ROOT").commit();
+                    .add(R.id.container_fragment, RkbHomeFragment.class, null, "ROOT").commit();
         }
 
 
