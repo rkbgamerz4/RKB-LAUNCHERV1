@@ -1,37 +1,31 @@
 package net.kdt.pojavlaunch.rkb.mods;
 
-import androidx.annotation.Keep;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
 /**
- * RKB Launcher Mod Manager — description of a single installed mod.
- * DISABLE does not delete the file; ENABLE does not re-download.
+ * One mod entry for RKB Mod Manager.
  */
-@Keep
 public class ModInfo {
-    public String fileName;          // e.g. sodium.jar
-    public String displayName;       // human readable
-    public String version;           // if detectable
-    public String loader;            // fabric / forge / quilt / unknown
-    public String mcVersionRange;    // if detectable
-    public boolean enabled;          // true = active for launch
-    public String absolutePath;      // current path on disk
-
-    public ModInfo() {}
+    public String fileName;
+    public String absolutePath;
+    public String displayName;
+    public boolean enabled;
 
     public ModInfo(String fileName, String absolutePath, boolean enabled) {
         this.fileName = fileName;
         this.absolutePath = absolutePath;
         this.enabled = enabled;
-        this.displayName = fileName.replace(".jar", "").replace(".disabled", "");
-        this.loader = "unknown";
+        this.displayName = stripExtension(fileName);
     }
 
-    @NonNull
-    @Override
-    public String toString() {
-        return (enabled ? "[ON] " : "[OFF] ") + displayName +
-                (version != null ? " (" + version + ")" : "");
+    private static String stripExtension(String name) {
+        if (name == null) return "";
+        String n = name;
+        if (n.toLowerCase().endsWith(".jar.disabled")) {
+            n = n.substring(0, n.length() - ".jar.disabled".length());
+        } else if (n.toLowerCase().endsWith(".disabled")) {
+            n = n.substring(0, n.length() - ".disabled".length());
+        } else if (n.toLowerCase().endsWith(".jar")) {
+            n = n.substring(0, n.length() - ".jar".length());
+        }
+        return n;
     }
 }
