@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -26,20 +27,24 @@ import net.kdt.pojavlaunch.value.launcherprofiles.MinecraftProfile;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 public class ModManagerFragment extends Fragment {
     public static final String TAG = "RKB_MOD_MANAGER";
 
-    private static final int BG      = 0xFF0A0E14;
-    private static final int CARD    = 0xFF121820;
-    private static final int ACCENT  = 0xFF00B4FF;
-    private static final int GREEN   = 0xFF00E676;
-    private static final int RED     = 0xFFFF5252;
-    private static final int TEXT    = 0xFFE8EEF5;
-    private static final int MUTED   = 0xFF8B9BB4;
+    private static final int BG     = 0xFF070B12;
+    private static final int CARD   = 0xFF0F1620;
+    private static final int ACCENT = 0xFF00B4FF;
+    private static final int GREEN  = 0xFF00E676;
+    private static final int RED    = 0xFFFF5252;
+    private static final int TEXT   = 0xFFE8EEF5;
+    private static final int MUTED  = 0xFF7A8BA0;
+    private static final int CHIP   = 0xFF1A2433;
 
     private LinearLayout mList;
-    private TextView mHeader;
+    private LinearLayout mTabs;
+    private TextView mSubtitle;
+    private String mSelectedKey;
 
     @Nullable
     @Override
@@ -53,36 +58,42 @@ public class ModManagerFragment extends Fragment {
 
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(16), dp(16), dp(24));
+        root.setPadding(dp(16), dp(12), dp(16), dp(28));
         scroll.addView(root);
 
-        // Top bar
-        LinearLayout top = row();
-        top.setPadding(0, 0, 0, dp(12));
-
-        Button back = pillButton("← Back", 0xFF1A2332, TEXT);
+        // Header row
+        LinearLayout header = row();
+        Button back = chip("← Back", CHIP, TEXT);
         back.setOnClickListener(v -> requireActivity().onBackPressed());
-        top.addView(back);
+        header.addView(back);
 
         TextView title = new TextView(requireContext());
-        title.setText("  Mod Manager");
+        title.setText("  RKB Mods");
         title.setTextColor(ACCENT);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(title);
-        root.addView(top);
+        header.addView(title);
+        root.addView(header);
 
-        // Header card
-        LinearLayout headerCard = card();
-        mHeader = new TextView(requireContext());
-        mHeader.setTextColor(MUTED);
-        mHeader.setTextSize(13);
-        mHeader.setLineSpacing(0, 1.2f);
-        headerCard.addView(mHeader);
-        root.addView(headerCard);
+        space(root, 6);
+
+        mSubtitle = new TextView(requireContext());
+        mSubtitle.setTextColor(MUTED);
+        mSubtitle.setTextSize(12);
+        mSubtitle.setText("Per instance · enable / disable");
+        root.addView(mSubtitle);
 
         space(root, 12);
+
+        // Instance tabs
+        HorizontalScrollView hsv = new HorizontalScrollView(requireContext());
+        hsv.setHorizontalScrollBarEnabled(false);
+        mTabs = row();
+        hsv.addView(mTabs);
+        root.addView(hsv);
+
+        space(root, 14);
 
         mList = new LinearLayout(requireContext());
         mList.setOrientation(LinearLayout.VERTICAL);
@@ -91,27 +102,80 @@ public class ModManagerFragment extends Fragment {
         space(root, 16);
 
         LinearLayout actions = row();
-        Button refresh = pillButton("Refresh", 0xFF1A2332, TEXT);
+        Button refresh = chip("Refresh", CHIP, TEXT);
+        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        p1.setMarginEnd(dp(8));
+        refresh.setLayoutParams(p1);
         refresh.setOnClickListener(v -> reload());
-        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, dp(44), 1f);
-        lp1.setMarginEnd(dp(8));
-        refresh.setLayoutParams(lp1);
         actions.addView(refresh);
 
-        Button openFolder = pillButton("Open folder", ACCENT, Color.WHITE);
-        openFolder.setOnClickListener(v -> {
+        Button open = chip("Open folder", ACCENT, Color.WHITE);
+        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        open.setLayoutParams(p2);
+        open.setOnClickListener(v -> {
             File mods = ModManager.getModsDir(getGameDir());
             //noinspection ResultOfMethodCallIgnored
             mods.mkdirs();
             Tools.openPath(requireContext(), mods, false);
         });
-        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, dp(44), 1f);
-        openFolder.setLayoutParams(lp2);
-        actions.addView(openFolder);
+        actions.addView(open);
         root.addView(actions);
 
+        buildTabs();
         reload();
         return scroll;
+    }
+
+    private void buildTabs() {
+        mTabs.removeAllViews();
+        try {
+            LauncherProfiles.load();
+            Map<String, MinecraftProfile> map = LauncherProfiles.mainProfileJson.profiles;
+            mSelectedKey = LauncherPreferences.DEFAULT_PREF.getString(
+                    LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
+
+            if (map == null || map.isEmpty()) {
+                addTab("Default", null, true);
+                return;
+            }
+
+            boolean any = false;
+            for (Map.Entry<String, MinecraftProfile> e : map.entrySet()) {
+                String key = e.getKey();
+                String name = e.getValue().name;
+                if (!Tools.isValidString(name)) name = key;
+                boolean selected = key.equals(mSelectedKey);
+                if (selected) any = true;
+                addTab(name, key, selected);
+            }
+            if (!any && map.size() > 0) {
+                // first as selected
+                String first = map.keySet().iterator().next();
+                mSelectedKey = first;
+                buildTabs();
+            }
+        } catch (Exception ex) {
+            addTab("Default", null, true);
+        }
+    }
+
+    private void addTab(String label, String key, boolean selected) {
+        Button b = chip(label, selected ? ACCENT : CHIP, selected ? Color.WHITE : TEXT);
+        b.setOnClickListener(v -> {
+            mSelectedKey = key;
+            if (key != null) {
+                LauncherPreferences.DEFAULT_PREF.edit()
+                        .putString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, key)
+                        .apply();
+            }
+            buildTabs();
+            reload();
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
+        lp.setMarginEnd(dp(8));
+        b.setLayoutParams(lp);
+        mTabs.addView(b);
     }
 
     private void reload() {
@@ -122,33 +186,52 @@ public class ModManagerFragment extends Fragment {
         int on = 0;
         for (ModInfo m : mods) if (m.enabled) on++;
 
-        mHeader.setText("Instance mods folder\n"
-                + gameDir.getName()
-                + "\n\n"
-                + mods.size() + " mods  ·  " + on + " enabled  ·  " + (mods.size() - on) + " disabled\n"
-                + "Tap ON/OFF to toggle (does not delete)");
+        mSubtitle.setText(mods.size() + " mods  ·  " + on + " enabled  ·  "
+                + (mods.size() - on) + " disabled");
 
         if (mods.isEmpty()) {
             TextView empty = new TextView(requireContext());
             empty.setTextColor(MUTED);
             empty.setTextSize(14);
-            empty.setPadding(0, dp(24), 0, dp(24));
-            empty.setText("No mods found.\nPut .jar files in the mods folder.");
+            empty.setPadding(0, dp(32), 0, 0);
+            empty.setText("No mods in this instance.\nPut .jar files in the mods folder.");
             mList.addView(empty);
             return;
         }
 
         for (ModInfo mod : mods) {
-            mList.addView(modRow(gameDir, mod));
-            space(mList, 8);
+            mList.addView(modCard(gameDir, mod));
+            space(mList, 10);
         }
     }
 
-    private View modRow(File gameDir, ModInfo mod) {
-        LinearLayout row = card();
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
+    private View modCard(File gameDir, ModInfo mod) {
+        LinearLayout card = new LinearLayout(requireContext());
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(12), dp(12));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(CARD);
+        bg.setCornerRadius(dp(14));
+        bg.setStroke(dp(1), 0xFF1C2838);
+        card.setBackground(bg);
 
+        // Icon circle
+        TextView icon = new TextView(requireContext());
+        icon.setText("🧩");
+        icon.setTextSize(18);
+        icon.setGravity(Gravity.CENTER);
+        GradientDrawable iconBg = new GradientDrawable();
+        iconBg.setColor(0xFF152030);
+        iconBg.setCornerRadius(dp(10));
+        icon.setBackground(iconBg);
+        icon.setPadding(dp(8), dp(8), dp(8), dp(8));
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(40), dp(40));
+        iconLp.setMarginEnd(dp(12));
+        icon.setLayoutParams(iconLp);
+        card.addView(icon);
+
+        // Name + status
         LinearLayout info = new LinearLayout(requireContext());
         info.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -159,36 +242,57 @@ public class ModManagerFragment extends Fragment {
         name.setTextColor(TEXT);
         name.setTextSize(14);
         name.setTypeface(Typeface.DEFAULT_BOLD);
-        name.setMaxLines(2);
+        name.setMaxLines(1);
         info.addView(name);
 
-        TextView status = new TextView(requireContext());
-        status.setText(mod.enabled ? "Enabled" : "Disabled");
-        status.setTextColor(mod.enabled ? GREEN : RED);
-        status.setTextSize(12);
-        info.addView(status);
-        row.addView(info);
+        TextView sub = new TextView(requireContext());
+        sub.setText(mod.enabled ? "Enabled" : "Disabled");
+        sub.setTextColor(mod.enabled ? GREEN : RED);
+        sub.setTextSize(12);
+        info.addView(sub);
+        card.addView(info);
 
-        Button toggle = pillButton(mod.enabled ? "ON" : "OFF",
-                mod.enabled ? 0xFF0D2818 : 0xFF2A1515,
-                mod.enabled ? GREEN : RED);
-        toggle.setMinWidth(dp(64));
-        final ModInfo modRef = mod;
+        // Switch-style toggle
+        Button toggle = switchBtn(mod.enabled);
+        final ModInfo ref = mod;
         toggle.setOnClickListener(v -> {
-            boolean ok = modRef.enabled
-                    ? ModManager.disableMod(gameDir, modRef)
-                    : ModManager.enableMod(gameDir, modRef);
+            boolean ok = ref.enabled
+                    ? ModManager.disableMod(gameDir, ref)
+                    : ModManager.enableMod(gameDir, ref);
             Toast.makeText(requireContext(),
-                    ok ? ((modRef.enabled ? "Disabled" : "Enabled") + ": " + modRef.displayName) : "Failed",
+                    ok ? ((ref.enabled ? "OFF" : "ON") + " · " + ref.displayName) : "Failed",
                     Toast.LENGTH_SHORT).show();
             reload();
         });
-        row.addView(toggle);
-        return row;
+        card.addView(toggle);
+        return card;
+    }
+
+    private Button switchBtn(boolean on) {
+        Button b = new Button(requireContext());
+        b.setText(on ? "ON" : "OFF");
+        b.setTextColor(on ? Color.WHITE : MUTED);
+        b.setTextSize(11);
+        b.setTypeface(Typeface.DEFAULT_BOLD);
+        b.setAllCaps(true);
+        b.setMinWidth(dp(56));
+        b.setPadding(dp(14), dp(6), dp(14), dp(6));
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(on ? ACCENT : 0xFF1A2230);
+        g.setCornerRadius(dp(20));
+        if (on) g.setStroke(0, 0);
+        else g.setStroke(dp(1), 0xFF2A3545);
+        b.setBackground(g);
+        return b;
     }
 
     private File getGameDir() {
         try {
+            if (Tools.isValidString(mSelectedKey)) {
+                LauncherProfiles.load();
+                MinecraftProfile p = LauncherProfiles.mainProfileJson.profiles.get(mSelectedKey);
+                if (p != null) return Tools.getGameDirPath(p);
+            }
             String key = LauncherPreferences.DEFAULT_PREF.getString(
                     LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
             if (Tools.isValidString(key)) {
@@ -207,39 +311,27 @@ public class ModManagerFragment extends Fragment {
         return l;
     }
 
-    private LinearLayout card() {
-        LinearLayout c = new LinearLayout(requireContext());
-        c.setOrientation(LinearLayout.VERTICAL);
-        c.setPadding(dp(14), dp(12), dp(14), dp(12));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(CARD);
-        bg.setCornerRadius(dp(12));
-        c.setBackground(bg);
-        return c;
-    }
-
-    private Button pillButton(String text, int bgColor, int textColor) {
+    private Button chip(String text, int bgColor, int textColor) {
         Button b = new Button(requireContext());
         b.setText(text);
         b.setTextColor(textColor);
         b.setTextSize(13);
         b.setAllCaps(false);
-        b.setPadding(dp(16), dp(8), dp(16), dp(8));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(bgColor);
-        bg.setCornerRadius(dp(22));
-        b.setBackground(bg);
+        b.setPadding(dp(14), dp(6), dp(14), dp(6));
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(bgColor);
+        g.setCornerRadius(dp(20));
+        b.setBackground(g);
         return b;
     }
 
-    private void space(LinearLayout parent, int dp) {
+    private void space(LinearLayout parent, int d) {
         View v = new View(requireContext());
-        v.setLayoutParams(new LinearLayout.LayoutParams(1, dp(dp)));
+        v.setLayoutParams(new LinearLayout.LayoutParams(1, dp(d)));
         parent.addView(v);
     }
 
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
-
-}
+    }
