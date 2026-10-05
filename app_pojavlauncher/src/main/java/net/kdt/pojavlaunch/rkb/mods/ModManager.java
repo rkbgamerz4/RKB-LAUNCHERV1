@@ -1,5 +1,3 @@
-package net.kdt.pojavlaunch.rkb.mods;
-
 import android.util.Log;
 
 import net.kdt.pojavlaunch.Tools;
@@ -25,6 +23,8 @@ import java.util.Locale;
  * - Enabled mods live in <gameDir>/mods/*.jar
  * - Disabled mods live in <gameDir>/mods/disabled/*.jar
  * - Toggle = atomic rename/move between the two directories
+ *
+ * Order is always alphabetical by displayName — OFF করলেও position বদলায় না।
  */
 public final class ModManager {
     private static final String TAG = "RKB-ModManager";
@@ -43,6 +43,7 @@ public final class ModManager {
 
     /**
      * Scan installed mods (both enabled and disabled) for the given gameDir.
+     * Sorted by displayName only — enabled/disabled does not change order.
      */
     public static List<ModInfo> listMods(File gameDir) {
         List<ModInfo> result = new ArrayList<>();
@@ -75,12 +76,10 @@ public final class ModManager {
             }
         }
 
-        Collections.sort(result, (a, b) -> {
-            int c = Boolean.compare(!a.enabled, !b.enabled); // enabled first
-            if (c != 0) return c;
-            return a.displayName.toLowerCase(Locale.ROOT)
-                    .compareTo(b.displayName.toLowerCase(Locale.ROOT));
-        });
+        // Stable alphabetical order — OFF করলেও জায়গায় থাকবে
+        Collections.sort(result, (a, b) ->
+                a.displayName.toLowerCase(Locale.ROOT)
+                        .compareTo(b.displayName.toLowerCase(Locale.ROOT)));
         return result;
     }
 
@@ -177,7 +176,6 @@ public final class ModManager {
      * (Already true by construction of enable/disable, but useful as a safety check.)
      */
     public static void prepareForLaunch(File gameDir) {
-        // No-op for the directory-move design; kept for future filtering logic.
         Log.d(TAG, "prepareForLaunch: " + listMods(gameDir).size() + " mods scanned");
     }
 }
