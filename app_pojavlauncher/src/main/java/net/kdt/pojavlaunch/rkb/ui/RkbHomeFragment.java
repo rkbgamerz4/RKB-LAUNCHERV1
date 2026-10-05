@@ -15,21 +15,16 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
-import net.kdt.pojavlaunch.fragments.MainMenuFragment;
-import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 
 public class RkbHomeFragment extends Fragment {
 
@@ -38,7 +33,6 @@ public class RkbHomeFragment extends Fragment {
     private static final int SIDE_BG     = 0xFF0B1220;
     private static final int CARD        = 0xFF121A2A;
     private static final int ACCENT      = 0xFF00B4FF;
-    private static final int ACCENT_DIM  = 0xFF0077AA;
     private static final int TEXT_MAIN   = 0xFFE8F4FF;
     private static final int TEXT_MUTED  = 0xFF8BA3C7;
     private static final int YT_RED      = 0xFFE53935;
@@ -78,7 +72,7 @@ public class RkbHomeFragment extends Fragment {
 
         sideNav.addView(spacer(ctx, 12));
 
-        // Nav items (ImageView based – no emoji)
+        // Nav items (ImageView – no emoji)
         sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_compass, true, v -> { /* already home */ }));
         sideNav.addView(spacer(ctx, 10));
         sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_manage, false, v ->
@@ -98,10 +92,11 @@ public class RkbHomeFragment extends Fragment {
         LinearLayout.LayoutParams flexLp = new LinearLayout.LayoutParams(1, 0, 1f);
         sideNav.addView(flex, flexLp);
 
+        // Settings – FIXED package
         sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_preferences, false, v -> {
             try {
                 Tools.swapFragment(requireActivity(),
-                        net.kdt.pojavlaunch.fragments.LauncherPreferenceFragment.class,
+                        net.kdt.pojavlaunch.prefs.LauncherPreferenceFragment.class,
                         "SETTINGS", null);
             } catch (Exception e) {
                 Toast.makeText(ctx, "Settings", Toast.LENGTH_SHORT).show();
@@ -204,7 +199,7 @@ public class RkbHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         centerRow.setLayoutParams(centerLp);
 
-        // Left empty / future server card space
+        // Left empty space
         View leftPad = new View(ctx);
         centerRow.addView(leftPad, new LinearLayout.LayoutParams(0, 1, 0.35f));
 
@@ -234,23 +229,22 @@ public class RkbHomeFragment extends Fragment {
         skinFrame.setBackground(skinBg);
         skinFrame.setLayoutParams(new LinearLayout.LayoutParams(dp(140), dp(180)));
 
-        // Simple blocky "skin" using nested views
+        // Simple blocky skin
         LinearLayout skinInner = new LinearLayout(ctx);
         skinInner.setOrientation(LinearLayout.VERTICAL);
         skinInner.setGravity(Gravity.CENTER_HORIZONTAL);
         skinInner.setPadding(0, dp(16), 0, 0);
 
-        // Head
         View head = new View(ctx);
         head.setBackground(rounded(0xFF4FC3F7, dp(6)));
         skinInner.addView(head, new LinearLayout.LayoutParams(dp(48), dp(48)));
         skinInner.addView(vSpace(ctx, 4));
-        // Body
+
         View body = new View(ctx);
         body.setBackground(rounded(0xFF0288D1, dp(4)));
         skinInner.addView(body, new LinearLayout.LayoutParams(dp(56), dp(70)));
         skinInner.addView(vSpace(ctx, 4));
-        // Legs
+
         LinearLayout legs = new LinearLayout(ctx);
         legs.setOrientation(LinearLayout.HORIZONTAL);
         View legL = new View(ctx);
@@ -316,13 +310,11 @@ public class RkbHomeFragment extends Fragment {
         instCard.setPadding(dp(10), dp(8), dp(10), dp(8));
         instCard.setGravity(Gravity.CENTER_VERTICAL);
 
-        // green accent bar
         View bar = new View(ctx);
         bar.setBackgroundColor(GREEN_PLAY);
         instCard.addView(bar, new LinearLayout.LayoutParams(dp(3), dp(28)));
         instCard.addView(hSpace(ctx, 8));
 
-        // dirt block placeholder
         View block = new View(ctx);
         block.setBackground(rounded(0xFF8B6914, dp(4)));
         instCard.addView(block, new LinearLayout.LayoutParams(dp(28), dp(28)));
@@ -344,7 +336,6 @@ public class RkbHomeFragment extends Fragment {
         instCard.addView(instText);
         instCard.addView(hSpace(ctx, 10));
 
-        // mini play
         TextView miniPlay = new TextView(ctx);
         miniPlay.setText("▶");
         miniPlay.setTextColor(Color.WHITE);
@@ -368,7 +359,7 @@ public class RkbHomeFragment extends Fragment {
         GradientDrawable dashed = new GradientDrawable();
         dashed.setColor(Color.TRANSPARENT);
         dashed.setCornerRadius(dp(14));
-        dashed.setStroke(dp(1), ACCENT, dp(6), dp(4)); // dashed-ish
+        dashed.setStroke(dp(1), ACCENT, dp(6), dp(4));
         newInst.setBackground(dashed);
         newInst.setPadding(dp(18), dp(10), dp(18), dp(10));
         newInst.setOnClickListener(v ->
