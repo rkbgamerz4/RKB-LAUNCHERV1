@@ -1,5 +1,6 @@
 package net.kdt.pojavlaunch.rkb.ui;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -11,8 +12,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.HorizontalScrollView;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -21,430 +21,475 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 
-import net.kdt.pojavlaunch.LauncherActivity;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
+import net.kdt.pojavlaunch.extra.ExtraConstants;
+import net.kdt.pojavlaunch.extra.ExtraCore;
+import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
-import net.kdt.pojavlaunch.profiles.ProfileAdapter;
-import net.kdt.pojavlaunch.value.MinecraftAccount;
 
-/**
- * RKB Home — CS Launcher style layout (native).
- * Side nav + center LAUNCH + instance chips.
- */
 public class RkbHomeFragment extends Fragment {
 
-    // Colors — Dark + Neon Blue
-    private static final int BG        = 0xFF070B12;
-    private static final int SIDE      = 0xFF0C121C;
-    private static final int CARD      = 0xFF0F1620;
-    private static final int ACCENT    = 0xFF00B4FF;
-    private static final int TEXT      = 0xFFE8EEF6;
-    private static final int MUTED     = 0xFF8A96A8;
-    private static final int LAUNCH_BG = 0xFFF0F4F8;
-    private static final int LAUNCH_TX = 0xFF0A0E14;
-    private static final int GREEN     = 0xFF22C55E;
+    // Colors – Dark + Neon Blue
+    private static final int BG          = 0xFF070B12;
+    private static final int SIDE_BG     = 0xFF0B1220;
+    private static final int CARD        = 0xFF121A2A;
+    private static final int ACCENT      = 0xFF00B4FF;
+    private static final int ACCENT_DIM  = 0xFF0077AA;
+    private static final int TEXT_MAIN   = 0xFFE8F4FF;
+    private static final int TEXT_MUTED  = 0xFF8BA3C7;
+    private static final int YT_RED      = 0xFFE53935;
+    private static final int DC_BLUE     = 0xFF5865F2;
+    private static final int GREEN_PLAY  = 0xFF00C853;
 
-    private LinearLayout mInstanceRow;
+    private TextView mInstanceLabel;
     private TextView mVersionLabel;
-    private String mSelectedProfileKey;
+    private String mSelectedInstance = "Default";
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        Context ctx = requireContext();
 
-        LinearLayout root = new LinearLayout(requireContext());
+        // ROOT – horizontal
+        LinearLayout root = new LinearLayout(ctx);
         root.setOrientation(LinearLayout.HORIZONTAL);
         root.setBackgroundColor(BG);
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // ===== LEFT SIDE NAV =====
-        root.addView(buildSideNav());
+        // ========== LEFT SIDE NAV ==========
+        LinearLayout sideNav = new LinearLayout(ctx);
+        sideNav.setOrientation(LinearLayout.VERTICAL);
+        sideNav.setBackgroundColor(SIDE_BG);
+        sideNav.setGravity(Gravity.CENTER_HORIZONTAL);
+        sideNav.setPadding(dp(8), dp(16), dp(8), dp(16));
+        LinearLayout.LayoutParams sideLp = new LinearLayout.LayoutParams(dp(64), ViewGroup.LayoutParams.MATCH_PARENT);
+        sideNav.setLayoutParams(sideLp);
 
-        // ===== MAIN CONTENT =====
-        LinearLayout main = new LinearLayout(requireContext());
+        // Top accent line
+        View accentLine = new View(ctx);
+        accentLine.setBackgroundColor(ACCENT);
+        sideNav.addView(accentLine, new LinearLayout.LayoutParams(dp(4), dp(28)));
+
+        sideNav.addView(spacer(ctx, 12));
+
+        // Nav items (ImageView based – no emoji)
+        sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_compass, true, v -> { /* already home */ }));
+        sideNav.addView(spacer(ctx, 10));
+        sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_manage, false, v ->
+                Toast.makeText(ctx, "Instances – Phase 2", Toast.LENGTH_SHORT).show()));
+        sideNav.addView(spacer(ctx, 10));
+        sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_view, false, v ->
+                Toast.makeText(ctx, "Controls", Toast.LENGTH_SHORT).show()));
+        sideNav.addView(spacer(ctx, 10));
+        sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_gallery, false, v ->
+                Toast.makeText(ctx, "Skins", Toast.LENGTH_SHORT).show()));
+        sideNav.addView(spacer(ctx, 10));
+        sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_info_details, false, v ->
+                Toast.makeText(ctx, "About RKB Launcher", Toast.LENGTH_SHORT).show()));
+
+        // Spacer push settings to bottom
+        View flex = new View(ctx);
+        LinearLayout.LayoutParams flexLp = new LinearLayout.LayoutParams(1, 0, 1f);
+        sideNav.addView(flex, flexLp);
+
+        sideNav.addView(navItem(ctx, android.R.drawable.ic_menu_preferences, false, v -> {
+            try {
+                Tools.swapFragment(requireActivity(),
+                        net.kdt.pojavlaunch.fragments.LauncherPreferenceFragment.class,
+                        "SETTINGS", null);
+            } catch (Exception e) {
+                Toast.makeText(ctx, "Settings", Toast.LENGTH_SHORT).show();
+            }
+        }));
+
+        root.addView(sideNav);
+
+        // ========== MAIN CONTENT ==========
+        LinearLayout main = new LinearLayout(ctx);
         main.setOrientation(LinearLayout.VERTICAL);
-        main.setLayoutParams(new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-        main.setPadding(dp(16), dp(12), dp(16), dp(12));
+        main.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        main.setPadding(dp(12), dp(10), dp(12), dp(10));
 
-        main.addView(buildTopBar());
-        main.addView(spacer(dp(8)));
-        main.addView(buildCenter());
-        main.addView(spacer(dp(12)));
-        main.addView(buildInstanceRow());
+        // --- TOP BAR ---
+        LinearLayout topBar = new LinearLayout(ctx);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+
+        // Logo pill
+        LinearLayout logoPill = pill(ctx, CARD, dp(22));
+        logoPill.setPadding(dp(10), dp(6), dp(14), dp(6));
+        logoPill.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView logoR = new TextView(ctx);
+        logoR.setText("R");
+        logoR.setTextColor(Color.WHITE);
+        logoR.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        logoR.setTypeface(Typeface.DEFAULT_BOLD);
+        logoR.setBackground(circle(ACCENT, dp(22)));
+        logoR.setGravity(Gravity.CENTER);
+        logoR.setWidth(dp(22));
+        logoR.setHeight(dp(22));
+        logoPill.addView(logoR);
+
+        logoPill.addView(hSpace(ctx, 8));
+
+        LinearLayout logoTextCol = new LinearLayout(ctx);
+        logoTextCol.setOrientation(LinearLayout.VERTICAL);
+        TextView title = new TextView(ctx);
+        title.setText("RKB LAUNCHER");
+        title.setTextColor(TEXT_MAIN);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        TextView sub = new TextView(ctx);
+        sub.setText("PLAY  •  EXPLORE  •  CREATE");
+        sub.setTextColor(TEXT_MUTED);
+        sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+        logoTextCol.addView(title);
+        logoTextCol.addView(sub);
+        logoPill.addView(logoTextCol);
+
+        topBar.addView(logoPill);
+        topBar.addView(hSpace(ctx, 10));
+
+        // YouTube
+        TextView ytBtn = actionChip(ctx, "YouTube", YT_RED);
+        ytBtn.setOnClickListener(v -> openUrl("https://youtube.com"));
+        topBar.addView(ytBtn);
+        topBar.addView(hSpace(ctx, 6));
+
+        // Discord
+        TextView dcBtn = actionChip(ctx, "Discord", DC_BLUE);
+        dcBtn.setOnClickListener(v -> openUrl("https://discord.gg"));
+        topBar.addView(dcBtn);
+
+        // Spacer
+        View topFlex = new View(ctx);
+        topBar.addView(topFlex, new LinearLayout.LayoutParams(0, 1, 1f));
+
+        // Account pill
+        LinearLayout accPill = pill(ctx, CARD, dp(20));
+        accPill.setPadding(dp(12), dp(6), dp(12), dp(6));
+        accPill.setGravity(Gravity.CENTER_VERTICAL);
+        TextView accTxt = new TextView(ctx);
+        accTxt.setText("RKB_GAMERZ  ·  LOCAL");
+        accTxt.setTextColor(TEXT_MAIN);
+        accTxt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        accTxt.setTypeface(Typeface.DEFAULT_BOLD);
+        accPill.addView(accTxt);
+        accPill.setOnClickListener(v -> {
+            try {
+                ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true);
+            } catch (Exception e) {
+                Toast.makeText(ctx, "Accounts", Toast.LENGTH_SHORT).show();
+            }
+        });
+        topBar.addView(accPill);
+
+        main.addView(topBar);
+        main.addView(vSpace(ctx, 12));
+
+        // --- CENTER AREA (skin + launch) ---
+        LinearLayout centerRow = new LinearLayout(ctx);
+        centerRow.setOrientation(LinearLayout.HORIZONTAL);
+        centerRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams centerLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        centerRow.setLayoutParams(centerLp);
+
+        // Left empty / future server card space
+        View leftPad = new View(ctx);
+        centerRow.addView(leftPad, new LinearLayout.LayoutParams(0, 1, 0.35f));
+
+        // Skin + Launch column
+        LinearLayout skinCol = new LinearLayout(ctx);
+        skinCol.setOrientation(LinearLayout.VERTICAL);
+        skinCol.setGravity(Gravity.CENTER_HORIZONTAL);
+        skinCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.45f));
+
+        // Player name tag
+        TextView playerTag = new TextView(ctx);
+        playerTag.setText("Player");
+        playerTag.setTextColor(TEXT_MAIN);
+        playerTag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        playerTag.setBackground(pillBg(0xCC1A2538, dp(12)));
+        playerTag.setPadding(dp(14), dp(4), dp(14), dp(4));
+        playerTag.setGravity(Gravity.CENTER);
+        skinCol.addView(playerTag);
+        skinCol.addView(vSpace(ctx, 8));
+
+        // Skin placeholder (blue neon frame)
+        FrameLayout skinFrame = new FrameLayout(ctx);
+        GradientDrawable skinBg = new GradientDrawable();
+        skinBg.setColor(0xFF0D1525);
+        skinBg.setCornerRadius(dp(16));
+        skinBg.setStroke(dp(2), ACCENT);
+        skinFrame.setBackground(skinBg);
+        skinFrame.setLayoutParams(new LinearLayout.LayoutParams(dp(140), dp(180)));
+
+        // Simple blocky "skin" using nested views
+        LinearLayout skinInner = new LinearLayout(ctx);
+        skinInner.setOrientation(LinearLayout.VERTICAL);
+        skinInner.setGravity(Gravity.CENTER_HORIZONTAL);
+        skinInner.setPadding(0, dp(16), 0, 0);
+
+        // Head
+        View head = new View(ctx);
+        head.setBackground(rounded(0xFF4FC3F7, dp(6)));
+        skinInner.addView(head, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        skinInner.addView(vSpace(ctx, 4));
+        // Body
+        View body = new View(ctx);
+        body.setBackground(rounded(0xFF0288D1, dp(4)));
+        skinInner.addView(body, new LinearLayout.LayoutParams(dp(56), dp(70)));
+        skinInner.addView(vSpace(ctx, 4));
+        // Legs
+        LinearLayout legs = new LinearLayout(ctx);
+        legs.setOrientation(LinearLayout.HORIZONTAL);
+        View legL = new View(ctx);
+        legL.setBackground(rounded(0xFF01579B, dp(3)));
+        View legR = new View(ctx);
+        legR.setBackground(rounded(0xFF01579B, dp(3)));
+        legs.addView(legL, new LinearLayout.LayoutParams(dp(22), dp(30)));
+        legs.addView(hSpace(ctx, 6));
+        legs.addView(legR, new LinearLayout.LayoutParams(dp(22), dp(30)));
+        skinInner.addView(legs);
+
+        skinFrame.addView(skinInner, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER));
+        skinCol.addView(skinFrame);
+        skinCol.addView(vSpace(ctx, 14));
+
+        // LAUNCH button
+        TextView launchBtn = new TextView(ctx);
+        launchBtn.setText("▶  LAUNCH");
+        launchBtn.setTextColor(Color.WHITE);
+        launchBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        launchBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        launchBtn.setGravity(Gravity.CENTER);
+        GradientDrawable launchBg = new GradientDrawable();
+        launchBg.setColor(ACCENT);
+        launchBg.setCornerRadius(dp(28));
+        launchBtn.setBackground(launchBg);
+        launchBtn.setPadding(dp(36), dp(14), dp(36), dp(14));
+        launchBtn.setOnClickListener(v -> doLaunch());
+        skinCol.addView(launchBtn);
+        skinCol.addView(vSpace(ctx, 10));
+
+        // Version selector
+        mVersionLabel = new TextView(ctx);
+        mVersionLabel.setText("▶  Minecraft 1.21.11  ▼");
+        mVersionLabel.setTextColor(TEXT_MAIN);
+        mVersionLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        mVersionLabel.setGravity(Gravity.CENTER);
+        mVersionLabel.setBackground(pillBg(CARD, dp(16)));
+        mVersionLabel.setPadding(dp(18), dp(8), dp(18), dp(8));
+        mVersionLabel.setOnClickListener(v ->
+                Toast.makeText(ctx, "Version picker – Phase 2", Toast.LENGTH_SHORT).show());
+        skinCol.addView(mVersionLabel);
+
+        centerRow.addView(skinCol);
+
+        // Right pad
+        View rightPad = new View(ctx);
+        centerRow.addView(rightPad, new LinearLayout.LayoutParams(0, 1, 0.20f));
+
+        main.addView(centerRow);
+
+        // --- BOTTOM INSTANCE ROW ---
+        LinearLayout bottomRow = new LinearLayout(ctx);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setGravity(Gravity.CENTER_VERTICAL);
+        bottomRow.setPadding(0, dp(8), 0, 0);
+
+        // Current instance card
+        LinearLayout instCard = pill(ctx, CARD, dp(14));
+        instCard.setPadding(dp(10), dp(8), dp(10), dp(8));
+        instCard.setGravity(Gravity.CENTER_VERTICAL);
+
+        // green accent bar
+        View bar = new View(ctx);
+        bar.setBackgroundColor(GREEN_PLAY);
+        instCard.addView(bar, new LinearLayout.LayoutParams(dp(3), dp(28)));
+        instCard.addView(hSpace(ctx, 8));
+
+        // dirt block placeholder
+        View block = new View(ctx);
+        block.setBackground(rounded(0xFF8B6914, dp(4)));
+        instCard.addView(block, new LinearLayout.LayoutParams(dp(28), dp(28)));
+        instCard.addView(hSpace(ctx, 8));
+
+        LinearLayout instText = new LinearLayout(ctx);
+        instText.setOrientation(LinearLayout.VERTICAL);
+        mInstanceLabel = new TextView(ctx);
+        mInstanceLabel.setText(mSelectedInstance);
+        mInstanceLabel.setTextColor(TEXT_MAIN);
+        mInstanceLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        mInstanceLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        TextView ver = new TextView(ctx);
+        ver.setText("1.21.11");
+        ver.setTextColor(TEXT_MUTED);
+        ver.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        instText.addView(mInstanceLabel);
+        instText.addView(ver);
+        instCard.addView(instText);
+        instCard.addView(hSpace(ctx, 10));
+
+        // mini play
+        TextView miniPlay = new TextView(ctx);
+        miniPlay.setText("▶");
+        miniPlay.setTextColor(Color.WHITE);
+        miniPlay.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        miniPlay.setBackground(circle(ACCENT, dp(26)));
+        miniPlay.setGravity(Gravity.CENTER);
+        miniPlay.setWidth(dp(26));
+        miniPlay.setHeight(dp(26));
+        miniPlay.setOnClickListener(v -> doLaunch());
+        instCard.addView(miniPlay);
+
+        bottomRow.addView(instCard);
+        bottomRow.addView(hSpace(ctx, 10));
+
+        // + New Instance
+        TextView newInst = new TextView(ctx);
+        newInst.setText("+  New Instance");
+        newInst.setTextColor(ACCENT);
+        newInst.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        newInst.setGravity(Gravity.CENTER);
+        GradientDrawable dashed = new GradientDrawable();
+        dashed.setColor(Color.TRANSPARENT);
+        dashed.setCornerRadius(dp(14));
+        dashed.setStroke(dp(1), ACCENT, dp(6), dp(4)); // dashed-ish
+        newInst.setBackground(dashed);
+        newInst.setPadding(dp(18), dp(10), dp(18), dp(10));
+        newInst.setOnClickListener(v ->
+                Toast.makeText(ctx, "New Instance – Phase 2", Toast.LENGTH_SHORT).show());
+        bottomRow.addView(newInst);
+
+        main.addView(bottomRow);
 
         root.addView(main);
         return root;
     }
 
-    // ---------- Side navigation ----------
-    private View buildSideNav() {
-        LinearLayout nav = new LinearLayout(requireContext());
-        nav.setOrientation(LinearLayout.VERTICAL);
-        nav.setBackgroundColor(SIDE);
-        nav.setGravity(Gravity.CENTER_HORIZONTAL);
-        nav.setPadding(0, dp(16), 0, dp(16));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(56), ViewGroup.LayoutParams.MATCH_PARENT);
-        nav.setLayoutParams(lp);
+    // ---------- helpers ----------
 
-        nav.addView(navBtn("🏠", true, this::goHome));
-        nav.addView(navBtn("📦", false, this::goInstances));
-        nav.addView(navBtn("🖱️", false, this::goControls));
-        nav.addView(navBtn("🎮", false, this::goGamepad));
-        nav.addView(navBtn("ℹ️", false, this::goAbout));
-        View space = new View(requireContext());
-        space.setLayoutParams(new LinearLayout.LayoutParams(1, 0, 1f));
-        nav.addView(space);
-        nav.addView(navBtn("⚙️", false, this::goSettings));
-        return nav;
-    }
-
-    private View navBtn(String emoji, boolean active, Runnable action) {
-        TextView t = new TextView(requireContext());
-        t.setText(emoji);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-        t.setGravity(Gravity.CENTER);
-        t.setPadding(0, dp(14), 0, dp(14));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(12));
-        bg.setColor(active ? 0x2200B4FF : Color.TRANSPARENT);
-        t.setBackground(bg);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(44), dp(44));
-        lp.gravity = Gravity.CENTER_HORIZONTAL;
-        lp.topMargin = dp(4);
-        lp.bottomMargin = dp(4);
-        t.setLayoutParams(lp);
-        t.setOnClickListener(v -> action.run());
-        return t;
-    }
-
-    // ---------- Top bar ----------
-    private View buildTopBar() {
-        LinearLayout bar = new LinearLayout(requireContext());
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        // Logo + name
-        LinearLayout brand = new LinearLayout(requireContext());
-        brand.setOrientation(LinearLayout.VERTICAL);
-        TextView name = new TextView(requireContext());
-        name.setText("RKB LAUNCHER");
-        name.setTextColor(TEXT);
-        name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        name.setTypeface(Typeface.DEFAULT_BOLD);
-        TextView sub = new TextView(requireContext());
-        sub.setText("RKB GAMERZ");
-        sub.setTextColor(MUTED);
-        sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        brand.addView(name);
-        brand.addView(sub);
-        bar.addView(brand);
-
-        View flex = new View(requireContext());
-        flex.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
-        bar.addView(flex);
-
-        // Discord pill
-        bar.addView(pill("Discord", 0xFF5865F2, v -> openUrl("https://discord.gg/")));
-
-        bar.addView(spacerH(dp(8)));
-
-        // Add account
-        bar.addView(pill("Add account", CARD, v -> goAccounts()));
-
-        return bar;
-    }
-
-    private Button pill(String text, int bgColor, View.OnClickListener click) {
-        Button b = new Button(requireContext());
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setTextColor(TEXT);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        b.setPadding(dp(14), dp(6), dp(14), dp(6));
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(bgColor);
-        g.setCornerRadius(dp(20));
-        b.setBackground(g);
-        b.setOnClickListener(click);
-        return b;
-    }
-
-    // ---------- Center: skin + LAUNCH ----------
-    private View buildCenter() {
-        LinearLayout center = new LinearLayout(requireContext());
-        center.setOrientation(LinearLayout.VERTICAL);
-        center.setGravity(Gravity.CENTER_HORIZONTAL);
-        center.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-
-        // Optional server card
-        LinearLayout server = cardRow();
-        server.setPadding(dp(12), dp(10), dp(12), dp(10));
-        TextView sName = new TextView(requireContext());
-        sName.setText("RKB Network");
-        sName.setTextColor(TEXT);
-        sName.setTypeface(Typeface.DEFAULT_BOLD);
-        sName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        TextView sSub = new TextView(requireContext());
-        sSub.setText("Offline · Ready");
-        sSub.setTextColor(MUTED);
-        sSub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        LinearLayout sText = new LinearLayout(requireContext());
-        sText.setOrientation(LinearLayout.VERTICAL);
-        sText.addView(sName);
-        sText.addView(sSub);
-        server.addView(sText);
-        View sFlex = new View(requireContext());
-        sFlex.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
-        server.addView(sFlex);
-        Button playMini = smallBtn("PLAY", GREEN);
-        playMini.setOnClickListener(v -> doLaunch());
-        server.addView(playMini);
-        LinearLayout.LayoutParams sLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        sLp.bottomMargin = dp(16);
-        server.setLayoutParams(sLp);
-        center.addView(server);
-
-        // Skin placeholder
-        TextView skin = new TextView(requireContext());
-        skin.setText("👤");
-        skin.setTextSize(TypedValue.COMPLEX_UNIT_SP, 64);
-        skin.setGravity(Gravity.CENTER);
-        skin.setPadding(0, dp(8), 0, dp(8));
-        center.addView(skin);
-
-        TextView player = new TextView(requireContext());
-        player.setText(getPlayerName());
-        player.setTextColor(TEXT);
-        player.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        player.setGravity(Gravity.CENTER);
-        player.setPadding(0, 0, 0, dp(16));
-        center.addView(player);
-
-        // Big LAUNCH
-        Button launch = new Button(requireContext());
-        launch.setText("▶  LAUNCH");
-        launch.setAllCaps(false);
-        launch.setTextColor(LAUNCH_TX);
-        launch.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
-        launch.setTypeface(Typeface.DEFAULT_BOLD);
-        launch.setPadding(dp(48), dp(14), dp(48), dp(14));
-        GradientDrawable lg = new GradientDrawable();
-        lg.setColor(LAUNCH_BG);
-        lg.setCornerRadius(dp(28));
-        launch.setBackground(lg);
-        launch.setOnClickListener(v -> doLaunch());
-        center.addView(launch);
-
-        mVersionLabel = new TextView(requireContext());
-        mVersionLabel.setText("Minecraft · Select instance");
-        mVersionLabel.setTextColor(MUTED);
-        mVersionLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        mVersionLabel.setGravity(Gravity.CENTER);
-        mVersionLabel.setPadding(0, dp(10), 0, 0);
-        center.addView(mVersionLabel);
-
-        return center;
-    }
-
-    // ---------- Instance chips ----------
-    private View buildInstanceRow() {
-        LinearLayout wrap = new LinearLayout(requireContext());
-        wrap.setOrientation(LinearLayout.VERTICAL);
-
-        TextView label = new TextView(requireContext());
-        label.setText("Instances");
-        label.setTextColor(MUTED);
-        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        label.setPadding(0, 0, 0, dp(6));
-        wrap.addView(label);
-
-        HorizontalScrollView hsv = new HorizontalScrollView(requireContext());
-        hsv.setHorizontalScrollBarEnabled(false);
-        mInstanceRow = new LinearLayout(requireContext());
-        mInstanceRow.setOrientation(LinearLayout.HORIZONTAL);
-        mInstanceRow.setGravity(Gravity.CENTER_VERTICAL);
-        hsv.addView(mInstanceRow);
-        wrap.addView(hsv);
-
-        reloadInstances();
-        return wrap;
-    }
-
-    private void reloadInstances() {
-        if (mInstanceRow == null) return;
-        mInstanceRow.removeAllViews();
-
-        // Default chip (always)
-        mInstanceRow.addView(instanceChip("Default", true));
-        mInstanceRow.addView(spacerH(dp(8)));
-        mInstanceRow.addView(instanceChip("Spunky Opti", false));
-        mInstanceRow.addView(spacerH(dp(8)));
-
-        // + New Instance
-        Button add = new Button(requireContext());
-        add.setText("+ New Instance");
-        add.setAllCaps(false);
-        add.setTextColor(ACCENT);
-        add.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.TRANSPARENT);
-        g.setStroke(dp(1), 0xFF3A4560);
-        g.setCornerRadius(dp(16));
-        add.setBackground(g);
-        add.setPadding(dp(16), dp(8), dp(16), dp(8));
-        add.setOnClickListener(v -> openNewInstance());
-        mInstanceRow.addView(add);
-    }
-
-    private View instanceChip(String name, boolean selected) {
-        Button b = new Button(requireContext());
-        b.setText(name);
-        b.setAllCaps(false);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        b.setTextColor(selected ? TEXT : MUTED);
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(selected ? 0xFF1A2435 : CARD);
-        g.setCornerRadius(dp(16));
-        if (selected) g.setStroke(dp(1), ACCENT);
-        b.setBackground(g);
-        b.setPadding(dp(16), dp(8), dp(16), dp(8));
-        b.setOnClickListener(v -> {
-            mSelectedProfileKey = name;
-            if (mVersionLabel != null) mVersionLabel.setText(name + " · Ready");
-            Toast.makeText(requireContext(), "Selected: " + name, Toast.LENGTH_SHORT).show();
-            reloadInstances(); // visual refresh — improve later with real profiles
-        });
-        return b;
-    }
-
-    // ---------- Actions ----------
     private void doLaunch() {
         try {
-            FragmentActivity act = requireActivity();
-            if (act instanceof LauncherActivity) {
-                // Trigger existing launch path if available
-                Toast.makeText(act, "Launching…", Toast.LENGTH_SHORT).show();
-                // TODO: call real launch — wire to LauncherActivity launch method
-            } else {
-                Toast.makeText(requireContext(), "Launch not wired yet", Toast.LENGTH_SHORT).show();
-            }
+            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
         } catch (Exception e) {
-            Toast.makeText(requireContext(), "Launch error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Launch: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
-    }
-
-    private void openNewInstance() {
-        Toast.makeText(requireContext(), "New Instance — Phase 2", Toast.LENGTH_SHORT).show();
-        // Phase 2: open create dialog
-    }
-
-    private void goHome() { /* already here */ }
-
-    private void goInstances() {
-        Toast.makeText(requireContext(), "Instances", Toast.LENGTH_SHORT).show();
-    }
-
-    private void goControls() {
-        try {
-            // Open custom controls if activity exists
-            Intent i = new Intent();
-            i.setClassName(requireContext(), "net.kdt.pojavlaunch.CustomControlsActivity");
-            startActivity(i);
-        } catch (Exception e) {
-            Toast.makeText(requireContext(), "Controls", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void goGamepad() {
-        Toast.makeText(requireContext(), "Gamepad", Toast.LENGTH_SHORT).show();
-    }
-
-    private void goAbout() {
-        Toast.makeText(requireContext(), "RKB Launcher · RKB GAMERZ", Toast.LENGTH_SHORT).show();
-    }
-
-    private void goSettings() {
-        // Try open settings fragment / activity
-        try {
-            Intent i = new Intent();
-            i.setClassName(requireContext(), "net.kdt.pojavlaunch.prefs.LauncherPreferenceActivity");
-            startActivity(i);
-        } catch (Exception e) {
-            Toast.makeText(requireContext(), "Settings", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void goAccounts() {
-        Toast.makeText(requireContext(), "Accounts", Toast.LENGTH_SHORT).show();
     }
 
     private void openUrl(String url) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-        } catch (Exception ignored) {}
-    }
-
-    private String getPlayerName() {
-        try {
-            // Best-effort; falls back if account API differs
-            return "Player";
         } catch (Exception e) {
-            return "Player";
+            Toast.makeText(requireContext(), url, Toast.LENGTH_SHORT).show();
         }
     }
 
-    // ---------- Helpers ----------
-    private LinearLayout cardRow() {
-        LinearLayout c = new LinearLayout(requireContext());
-        c.setOrientation(LinearLayout.HORIZONTAL);
-        c.setGravity(Gravity.CENTER_VERTICAL);
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(CARD);
-        g.setCornerRadius(dp(14));
-        c.setBackground(g);
-        return c;
+    private View navItem(Context ctx, int iconRes, boolean active, View.OnClickListener click) {
+        FrameLayout wrap = new FrameLayout(ctx);
+        int size = dp(44);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+        wrap.setLayoutParams(lp);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(12));
+        if (active) {
+            bg.setColor(0x3300B4FF);
+            bg.setStroke(dp(2), ACCENT);
+        } else {
+            bg.setColor(0x00000000);
+        }
+        wrap.setBackground(bg);
+
+        ImageView iv = new ImageView(ctx);
+        try {
+            iv.setImageResource(iconRes);
+        } catch (Exception ignored) {}
+        iv.setColorFilter(active ? ACCENT : TEXT_MUTED);
+        FrameLayout.LayoutParams ivLp = new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER);
+        wrap.addView(iv, ivLp);
+        wrap.setOnClickListener(click);
+        return wrap;
     }
 
-    private Button smallBtn(String text, int bg) {
-        Button b = new Button(requireContext());
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setTextColor(Color.WHITE);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        b.setPadding(dp(14), dp(4), dp(14), dp(4));
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(bg);
-        g.setCornerRadius(dp(12));
-        b.setBackground(g);
-        return b;
+    private TextView actionChip(Context ctx, String text, int color) {
+        TextView t = new TextView(ctx);
+        t.setText(text);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(dp(14));
+        t.setBackground(bg);
+        t.setPadding(dp(14), dp(6), dp(14), dp(6));
+        return t;
     }
 
-    private View spacer(int h) {
-        View v = new View(requireContext());
-        v.setLayoutParams(new LinearLayout.LayoutParams(1, h));
+    private LinearLayout pill(Context ctx, int color, int radiusDp) {
+        LinearLayout l = new LinearLayout(ctx);
+        l.setOrientation(LinearLayout.HORIZONTAL);
+        l.setBackground(pillBg(color, radiusDp));
+        return l;
+    }
+
+    private GradientDrawable pillBg(int color, int radiusDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        return g;
+    }
+
+    private GradientDrawable circle(int color, int sizeDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setShape(GradientDrawable.OVAL);
+        return g;
+    }
+
+    private GradientDrawable rounded(int color, int radiusDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        return g;
+    }
+
+    private View spacer(Context ctx, int h) {
+        View v = new View(ctx);
+        v.setLayoutParams(new LinearLayout.LayoutParams(1, dp(h)));
         return v;
     }
 
-    private View spacerH(int w) {
-        View v = new View(requireContext());
-        v.setLayoutParams(new LinearLayout.LayoutParams(w, 1));
+    private View vSpace(Context ctx, int h) {
+        View v = new View(ctx);
+        v.setLayoutParams(new LinearLayout.LayoutParams(1, dp(h)));
+        return v;
+    }
+
+    private View hSpace(Context ctx, int w) {
+        View v = new View(ctx);
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(w), 1));
         return v;
     }
 
     private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
+        return (int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, v,
+                getResources().getDisplayMetrics());
     }
 }
