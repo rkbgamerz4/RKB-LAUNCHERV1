@@ -54,9 +54,12 @@
             </intent-filter>
         </activity>
 
+        <!-- RKB Home: forced landscape -->
         <activity
             android:name=".LauncherActivity"
             android:label="@string/app_short_name"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
