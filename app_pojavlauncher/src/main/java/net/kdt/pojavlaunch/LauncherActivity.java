@@ -1,13 +1,22 @@
 package net.kdt.pojavlaunch;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.Spinner;
+import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import net.kdt.pojavlaunch.extra.ExtraConstants;
@@ -17,30 +26,54 @@ import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
 
 public class LauncherActivity extends AppCompatActivity {
 
-    @Nullable
-    private Spinner mAccountSpinner;
-    @Nullable
-    private ImageButton mSettingsButton;
+    // Required by Tools.java
+    public ActivityResultLauncher<Intent> modInstallerLauncher;
+
+    @Nullable private Spinner mAccountSpinner;
+    @Nullable private ImageButton mSettingsButton;
+
+    private Runnable mNotificationPermissionCallback;
+
+    private final ActivityResultLauncher<String> mNotificationPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (mNotificationPermissionCallback != null) {
+                    mNotificationPermissionCallback.run();
+                    mNotificationPermissionCallback = null;
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Prefer activity_launcher, fallback if needed
+        // Layout – try common names
         int layoutId = getResources().getIdentifier("activity_launcher", "layout", getPackageName());
-        if (layoutId == 0) {
-            layoutId = getResources().getIdentifier("activity_main", "layout", getPackageName());
-        }
+        if (layoutId == 0) layoutId = getResources().getIdentifier("activity_main", "layout", getPackageName());
+        if (layoutId == 0) layoutId = getResources().getIdentifier("launcher_activity", "layout", getPackageName());
         if (layoutId != 0) {
             setContentView(layoutId);
         } else {
-            setContentView(R.layout.activity_launcher);
+            // Absolute last resort – create empty container
+            android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+            root.setId(android.view.View.generateViewId());
+            root.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            setContentView(root);
+            // store generated id for fragment later
+            root.setTag("rkb_root");
         }
+
+        // Mod installer launcher (required by Tools.java)
+        modInstallerLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    // handled by Tools / mod installer flow
+                });
 
         bindViews();
         hideStockTopChrome();
 
-        // Open RKB custom home
         if (savedInstanceState == null) {
             openRkbHome();
         }
@@ -50,6 +83,7 @@ public class LauncherActivity extends AppCompatActivity {
         try {
             int accId = getResources().getIdentifier("account_spinner", "id", getPackageName());
             int setId = getResources().getIdentifier("setting_button", "id", getPackageName());
+            if (setId == 0) setId = getResources().getIdentifier("settings_button", "id", getPackageName());
             if (accId != 0) mAccountSpinner = findViewById(accId);
             if (setId != 0) mSettingsButton = findViewById(setId);
         } catch (Exception ignored) {}
@@ -57,25 +91,28 @@ public class LauncherActivity extends AppCompatActivity {
 
     private void openRkbHome() {
         int containerId = getResources().getIdentifier("container_fragment", "id", getPackageName());
-        if (containerId == 0) {
-            containerId = getResources().getIdentifier("main_fragment", "id", getPackageName());
-        }
-        if (containerId == 0) {
-            containerId = getResources().getIdentifier("fragment_container", "id", getPackageName());
-        }
-        if (containerId == 0) {
-            // last resort – common Pojav id
-            try {
-                containerId = R.id.container_fragment;
-            } catch (Exception e) {
-                return;
-            }
+        if (containerId == 0) containerId = getResources().getIdentifier("main_fragment", "id", getPackageName());
+        if (containerId == 0) containerId = getResources().getIdentifier("fragment_container", "id", getPackageName());
+        if (containerId == 0) containerId = getResources().getIdentifier("content_frame", "id", getPackageName());
+
+        if (containerId != 0) {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(containerId, new RkbHomeFragment())
+                    .commitAllowingStateLoss();
+            return;
         }
 
-        getSupportFragmentManager()
-                .beginTransaction()
-                .replace(containerId, new RkbHomeFragment())
-                .commitAllowingStateLoss();
+        // Fallback: use android.R.id.content
+        try {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(android.R.id.content, new RkbHomeFragment())
+                    .commitAllowingStateLoss();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "RKB Home failed to open", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void hideStockTopChrome() {
@@ -89,25 +126,17 @@ public class LauncherActivity extends AppCompatActivity {
                 hideParent(mSettingsButton);
             }
 
-            // hide by common resource names
             String[] names = {
-                    "account_spinner",
-                    "setting_button",
-                    "settings_button",
-                    "top_bar",
-                    "toolbar",
-                    "account_layout",
-                    "account_bar",
-                    "header_layout"
+                    "account_spinner", "setting_button", "settings_button",
+                    "top_bar", "toolbar", "account_layout", "account_bar", "header_layout"
             };
             for (String name : names) {
                 int id = getResources().getIdentifier(name, "id", getPackageName());
-                if (id != 0) {
-                    View v = findViewById(id);
-                    if (v != null) {
-                        v.setVisibility(View.GONE);
-                        hideParent(v);
-                    }
+                if (id == 0) continue;
+                View v = findViewById(id);
+                if (v != null) {
+                    v.setVisibility(View.GONE);
+                    hideParent(v);
                 }
             }
         } catch (Exception ignored) {}
@@ -125,21 +154,45 @@ public class LauncherActivity extends AppCompatActivity {
         } catch (Exception ignored) {}
     }
 
+    // ===== Required by LauncherPreferenceFragment =====
+    public boolean checkForNotificationPermission() {
+        if (Build.VERSION.SDK_INT < 33) return true;
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public void askForNotificationPermission(@Nullable Runnable onGranted) {
+        if (Build.VERSION.SDK_INT < 33) {
+            if (onGranted != null) onGranted.run();
+            return;
+        }
+        if (checkForNotificationPermission()) {
+            if (onGranted != null) onGranted.run();
+            return;
+        }
+        mNotificationPermissionCallback = onGranted;
+        mNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         hideStockTopChrome();
     }
 
-    /** Used by other Pojav code / fragments */
+    /** Used by other Pojav fragments */
     public void swapFragment(Class<? extends Fragment> clazz) {
         try {
             Fragment f = clazz.getDeclaredConstructor().newInstance();
             int containerId = getResources().getIdentifier("container_fragment", "id", getPackageName());
+            if (containerId == 0) containerId = getResources().getIdentifier("main_fragment", "id", getPackageName());
             if (containerId == 0) {
-                try { containerId = R.id.container_fragment; } catch (Exception ignored) {}
-            }
-            if (containerId != 0) {
+                getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(android.R.id.content, f)
+                        .addToBackStack(null)
+                        .commitAllowingStateLoss();
+            } else {
                 getSupportFragmentManager()
                         .beginTransaction()
                         .replace(containerId, f)
