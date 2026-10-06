@@ -1,365 +1,137 @@
 package net.kdt.pojavlaunch;
 
-import net.kdt.pojavlaunch.rkb.discord.DiscordRPC;
-import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
-
-import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
-import android.Manifest;
-import android.app.NotificationManager;
-import android.content.Context;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
-import android.widget.Toast;
+import android.widget.Spinner;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentContainerView;
-import androidx.fragment.app.FragmentManager;
 
-import com.kdt.mcgui.ProgressLayout;
-import com.kdt.mcgui.mcAccountSpinner;
-
-import net.kdt.pojavlaunch.contracts.OpenDocumentWithExtension;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
-import net.kdt.pojavlaunch.extra.ExtraListener;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
-import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
-import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
-import net.kdt.pojavlaunch.lifecycle.ContextAwareDoneListener;
-import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
-import net.kdt.pojavlaunch.modloaders.modpacks.ModloaderInstallTracker;
-import net.kdt.pojavlaunch.modloaders.modpacks.imagecache.IconCacheJanitor;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
-import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment;
-import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
-import net.kdt.pojavlaunch.progresskeeper.TaskCountListener;
-import net.kdt.pojavlaunch.services.ProgressServiceKeeper;
-import net.kdt.pojavlaunch.tasks.AsyncMinecraftDownloader;
-import net.kdt.pojavlaunch.tasks.AsyncVersionList;
-import net.kdt.pojavlaunch.tasks.MinecraftDownloader;
-import net.kdt.pojavlaunch.utils.DateUtils;
-import net.kdt.pojavlaunch.utils.NotificationUtils;
-import net.kdt.pojavlaunch.value.launcherprofiles.LauncherProfiles;
-import net.kdt.pojavlaunch.value.launcherprofiles.MinecraftProfile;
+import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
 
-import java.lang.ref.WeakReference;
-import java.text.ParseException;
+public class LauncherActivity extends AppCompatActivity {
 
-public class LauncherActivity extends BaseActivity {
-    public static final String SETTING_FRAGMENT_TAG = "SETTINGS_FRAGMENT";
-
-    public final ActivityResultLauncher<Object> modInstallerLauncher =
-            registerForActivityResult(new OpenDocumentWithExtension("jar"), (data)->{
-                if(data != null) Tools.launchModInstaller(this, data);
-            });
-
-    private mcAccountSpinner mAccountSpinner;
-    private FragmentContainerView mFragmentView;
+    private Spinner mAccountSpinner;
     private ImageButton mSettingsButton;
-    private ProgressLayout mProgressLayout;
-    private ProgressServiceKeeper mProgressServiceKeeper;
-    private ModloaderInstallTracker mInstallTracker;
-    private NotificationManager mNotificationManager;
-
-    /* Allows to switch from one button "type" to another */
-    private final FragmentManager.FragmentLifecycleCallbacks mFragmentCallbackListener = new FragmentManager.FragmentLifecycleCallbacks() {
-        @Override
-        public void onFragmentResumed(@NonNull FragmentManager fm, @NonNull Fragment f) {
-            boolean isHome = f instanceof MainMenuFragment || f instanceof RkbHomeFragment;
-            mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(),
-                    isHome ? R.drawable.ic_menu_settings : R.drawable.ic_menu_home));
-        }
-    };
-
-    /* Listener for the back button in settings */
-    private final ExtraListener<String> mBackPreferenceListener = (key, value) -> {
-        if(value.equals("true")) onBackPressed();
-        return false;
-    };
-
-    /* Listener for the auth method selection screen */
-    private final ExtraListener<Boolean> mSelectAuthMethod = (key, value) -> {
-        Fragment fragment = getSupportFragmentManager().findFragmentById(mFragmentView.getId());
-        // Allow starting the add account only from the main menu / RKB home
-        if(!(fragment instanceof MainMenuFragment) && !(fragment instanceof RkbHomeFragment)) return false;
-
-        Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
-        return false;
-    };
-
-    /* Listener for the settings fragment */
-    private final View.OnClickListener mSettingButtonListener = v -> {
-        Fragment fragment = getSupportFragmentManager().findFragmentById(mFragmentView.getId());
-        if(fragment instanceof MainMenuFragment || fragment instanceof RkbHomeFragment){
-            Tools.swapFragment(this, LauncherPreferenceFragment.class, SETTING_FRAGMENT_TAG, null);
-        } else{
-            // The setting button doubles as a home button now
-            Tools.backToMainMenu(this);
-        }
-    };
-
-    private final ExtraListener<Boolean> mLaunchGameListener = (key, value) -> {
-        if(mProgressLayout.hasProcesses()){
-            Toast.makeText(this, R.string.tasks_ongoing, Toast.LENGTH_LONG).show();
-            return false;
-        }
-
-        String selectedProfile = LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE,"");
-        if (LauncherProfiles.mainProfileJson == null || !LauncherProfiles.mainProfileJson.profiles.containsKey(selectedProfile)){
-            Toast.makeText(this, R.string.error_no_version, Toast.LENGTH_LONG).show();
-            return false;
-        }
-        MinecraftProfile prof = LauncherProfiles.mainProfileJson.profiles.get(selectedProfile);
-        if (prof == null || prof.lastVersionId == null || "Unknown".equals(prof.lastVersionId)){
-            Toast.makeText(this, R.string.error_no_version, Toast.LENGTH_LONG).show();
-            return false;
-        }
-
-        if(mAccountSpinner.getSelectedAccount() == null){
-            Toast.makeText(this, R.string.no_saved_accounts, Toast.LENGTH_LONG).show();
-            ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true);
-            return false;
-        }
-        String normalizedVersionId = AsyncMinecraftDownloader.normalizeVersionId(prof.lastVersionId);
-        JMinecraftVersionList.Version mcVersion = AsyncMinecraftDownloader.getListedVersion(normalizedVersionId);
-
-        // Only true Mojang Demo accounts (username starts with "Demo.") are restricted.
-        // Local / offline accounts (e.g. RKB_GAMERZ) must always be allowed to play.
-        if (mAccountSpinner.getSelectedAccount().isDemo()) {
-            boolean isOlderThan13 = true;
-            if (mcVersion != null) {
-                try {
-                    isOlderThan13 = DateUtils.dateBefore(DateUtils.parseReleaseDate(mcVersion.releaseTime), 2012, 6, 22);
-                } catch (ParseException ignored) {}
-            }
-            if (isOlderThan13) {
-                Toast.makeText(this, R.string.toast_not_available_demo, Toast.LENGTH_LONG).show();
-                return false;
-            }
-        }
-
-        new MinecraftDownloader().start(
-                this,
-                mcVersion,
-                normalizedVersionId,
-                new ContextAwareDoneListener(this, normalizedVersionId)
-        );
-        return false;
-    };
-
-    private final TaskCountListener mDoubleLaunchPreventionListener = taskCount -> {
-        // Hide the notification that starts the game if there are tasks executing.
-        // Prevents the user from trying to launch the game with tasks ongoing.
-        if(taskCount > 0) {
-            Tools.runOnUiThread(() ->
-                    mNotificationManager.cancel(NotificationUtils.NOTIFICATION_ID_GAME_START)
-            );
-        }
-    };
-
-    private ActivityResultLauncher<String> mRequestNotificationPermissionLauncher;
-    private WeakReference<Runnable> mRequestNotificationPermissionRunnable;
 
     @Override
-    protected boolean shouldIgnoreNotch() {
-        return getResources().getConfiguration().orientation == ORIENTATION_PORTRAIT;
-    }
-
-    @Override
-    public boolean setFullscreen() {
-        return false;
-    }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Discord Social SDK init (Rich Presence)
-        DiscordRPC.initSdk(this);
-        setContentView(R.layout.activity_pojav_launcher);
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        // If we don't have a back stack root yet...
-        if(fragmentManager.getBackStackEntryCount() < 1) {
-            // RKB Home (CS-style) as root instead of stock MainMenuFragment
-            fragmentManager.beginTransaction()
-                    .setReorderingAllowed(true)
-                    .addToBackStack("ROOT")
-                    .add(R.id.container_fragment, RkbHomeFragment.class, null, "ROOT").commit();
+        setContentView(R.layout.activity_launcher);
+
+        // bind stock views (may be null if layout changed)
+        try {
+            mAccountSpinner = findViewById(R.id.account_spinner);
+            mSettingsButton = findViewById(R.id.setting_button);
+        } catch (Exception ignored) {}
+
+        // ===== RKB: hide entire stock top bar =====
+        hideStockTopChrome();
+
+        // Open RKB Home instead of default MainMenu
+        if (savedInstanceState == null) {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.container_fragment, new RkbHomeFragment())
+                    .commit();
         }
 
+        // Keep ExtraCore listeners alive if any
+        ExtraCore.addExtraListener(ExtraConstants.LAUNCH_GAME, (key, value) -> {
+            // default launch path already handled by Pojav core
+        });
+    }
 
-        IconCacheJanitor.runJanitor();
-        mRequestNotificationPermissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestPermission(),
-                isAllowed -> {
-                    if(!isAllowed) handleNoNotificationPermission();
-                    else {
-                        Runnable runnable = Tools.getWeakReference(mRequestNotificationPermissionRunnable);
-                        if(runnable != null) runnable.run();
+    private void hideStockTopChrome() {
+        try {
+            // hide spinner + settings
+            if (mAccountSpinner != null) {
+                mAccountSpinner.setVisibility(View.GONE);
+                View parent = (View) mAccountSpinner.getParent();
+                if (parent != null) {
+                    parent.setVisibility(View.GONE);
+                    if (parent.getParent() instanceof View) {
+                        ((View) parent.getParent()).setVisibility(View.GONE);
                     }
                 }
-        );
-        getWindow().setBackgroundDrawable(null);
-        bindViews();
-        checkNotificationPermission();
-        mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        ProgressKeeper.addTaskCountListener(mDoubleLaunchPreventionListener);
-        ProgressKeeper.addTaskCountListener((mProgressServiceKeeper = new ProgressServiceKeeper(this)));
+            }
+            if (mSettingsButton != null) {
+                mSettingsButton.setVisibility(View.GONE);
+            }
 
-        mSettingsButton.setOnClickListener(mSettingButtonListener);
-        ProgressKeeper.addTaskCountListener(mProgressLayout);
-        ExtraCore.addExtraListener(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
-        ExtraCore.addExtraListener(ExtraConstants.SELECT_AUTH_METHOD, mSelectAuthMethod);
+            // also try by resource name (safer)
+            int accId = getResources().getIdentifier("account_spinner", "id", getPackageName());
+            int setId = getResources().getIdentifier("setting_button", "id", getPackageName());
+            int topBarId = getResources().getIdentifier("top_bar", "id", getPackageName());
+            int toolbarId = getResources().getIdentifier("toolbar", "id", getPackageName());
 
-        ExtraCore.addExtraListener(ExtraConstants.LAUNCH_GAME, mLaunchGameListener);
+            hideById(accId);
+            hideById(setId);
+            hideById(topBarId);
+            hideById(toolbarId);
 
-        new AsyncVersionList().getVersionList(versions -> ExtraCore.setValue(ExtraConstants.RELEASE_TABLE, versions), false);
+            // hide any view that contains "Add account"
+            View root = findViewById(android.R.id.content);
+            if (root != null) {
+                hideViewsWithText(root, "Add account");
+            }
+        } catch (Exception ignored) {}
+    }
 
-        mInstallTracker = new ModloaderInstallTracker(this);
+    private void hideById(int id) {
+        if (id == 0) return;
+        View v = findViewById(id);
+        if (v != null) {
+            v.setVisibility(View.GONE);
+            if (v.getParent() instanceof View) {
+                ((View) v.getParent()).setVisibility(View.GONE);
+            }
+        }
+    }
 
-        mProgressLayout.observe(ProgressLayout.DOWNLOAD_MINECRAFT);
-        mProgressLayout.observe(ProgressLayout.UNPACK_RUNTIME);
-        mProgressLayout.observe(ProgressLayout.INSTALL_MODPACK);
-        mProgressLayout.observe(ProgressLayout.AUTHENTICATE_MICROSOFT);
-        mProgressLayout.observe(ProgressLayout.DOWNLOAD_VERSION_LIST);
+    private void hideViewsWithText(View root, String text) {
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View child = group.getChildAt(i);
+                if (child instanceof android.widget.TextView) {
+                    CharSequence t = ((android.widget.TextView) child).getText();
+                    if (t != null && t.toString().toLowerCase().contains(text.toLowerCase())) {
+                        child.setVisibility(View.GONE);
+                        if (child.getParent() instanceof View) {
+                            ((View) child.getParent()).setVisibility(View.GONE);
+                        }
+                    }
+                }
+                hideViewsWithText(child, text);
+            }
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // RKB Discord Rich Presence — browsing launcher
-        try { DiscordRPC.setBrowsingLauncher(); } catch (Throwable ignored) {}
-        ContextExecutor.setActivity(this);
-        mInstallTracker.attach();
+        // re-hide in case layout re-inflates
+        hideStockTopChrome();
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        ContextExecutor.clearActivity();
-        mInstallTracker.detach();
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        getSupportFragmentManager().registerFragmentLifecycleCallbacks(mFragmentCallbackListener, true);
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        mProgressLayout.cleanUpObservers();
-        ProgressKeeper.removeTaskCountListener(mProgressLayout);
-        ProgressKeeper.removeTaskCountListener(mProgressServiceKeeper);
-        ExtraCore.removeExtraListenerFromValue(ExtraConstants.BACK_PREFERENCE, mBackPreferenceListener);
-        ExtraCore.removeExtraListenerFromValue(ExtraConstants.SELECT_AUTH_METHOD, mSelectAuthMethod);
-        ExtraCore.removeExtraListenerFromValue(ExtraConstants.LAUNCH_GAME, mLaunchGameListener);
-
-        getSupportFragmentManager().unregisterFragmentLifecycleCallbacks(mFragmentCallbackListener);
-    }
-
-    /** Custom implementation to feel more natural when a backstack isn't present */
-    @Override
-    public void onBackPressed() {
-        MicrosoftLoginFragment fragment = (MicrosoftLoginFragment) getVisibleFragment(MicrosoftLoginFragment.TAG);
-        if(fragment != null){
-            if(fragment.canGoBack()){
-                fragment.goBack();
-                return;
-            }
+    // Helper used by other Pojav fragments
+    public void swapFragment(Class<? extends Fragment> fragmentClass) {
+        try {
+            Fragment f = fragmentClass.newInstance();
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.container_fragment, f)
+                    .addToBackStack(null)
+                    .commit();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        // Check if we are at the root then
-        if(getVisibleFragment("ROOT") != null){
-            finish();
-        }
-
-        super.onBackPressed();
-    }
-
-    @Override
-    public void onAttachedToWindow() {
-        LauncherPreferences.computeNotchSize(this);
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    private Fragment getVisibleFragment(String tag){
-        Fragment fragment = getSupportFragmentManager().findFragmentByTag(tag);
-        if(fragment != null && fragment.isVisible()) {
-            return fragment;
-        }
-        return null;
-    }
-
-    @SuppressWarnings("unused")
-    private Fragment getVisibleFragment(int id){
-        Fragment fragment = getSupportFragmentManager().findFragmentById(id);
-        if(fragment != null && fragment.isVisible()) {
-            return fragment;
-        }
-        return null;
-    }
-
-    private void checkNotificationPermission() {
-        if(LauncherPreferences.PREF_SKIP_NOTIFICATION_PERMISSION_CHECK ||
-            checkForNotificationPermission()) {
-            return;
-        }
-
-        if(ActivityCompat.shouldShowRequestPermissionRationale(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS)) {
-            showNotificationPermissionReasoning();
-            return;
-        }
-        askForNotificationPermission(null);
-    }
-
-    private void showNotificationPermissionReasoning() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.notification_permission_dialog_title)
-                .setMessage(R.string.notification_permission_dialog_text)
-                .setPositiveButton(android.R.string.ok, (d, w) -> askForNotificationPermission(null))
-                .setNegativeButton(android.R.string.cancel, (d, w)-> handleNoNotificationPermission())
-                .show();
-    }
-
-    private void handleNoNotificationPermission() {
-        LauncherPreferences.PREF_SKIP_NOTIFICATION_PERMISSION_CHECK = true;
-        LauncherPreferences.DEFAULT_PREF.edit()
-                .putBoolean(LauncherPreferences.PREF_KEY_SKIP_NOTIFICATION_CHECK, true)
-                .apply();
-        Toast.makeText(this, R.string.notification_permission_toast, Toast.LENGTH_LONG).show();
-    }
-
-    public boolean checkForNotificationPermission() {
-        return Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_DENIED;
-    }
-
-    public void askForNotificationPermission(Runnable onSuccessRunnable) {
-        if(Build.VERSION.SDK_INT < 33) return;
-        if(onSuccessRunnable != null) {
-            mRequestNotificationPermissionRunnable = new WeakReference<>(onSuccessRunnable);
-        }
-        mRequestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
-    }
-
-    /** Stuff all the view boilerplate here */
-    private void bindViews(){
-        mFragmentView = findViewById(R.id.container_fragment);
-        mSettingsButton = findViewById(R.id.setting_button);
-        mAccountSpinner = findViewById(R.id.account_spinner);
-        mProgressLayout = findViewById(R.id.progress_layout);
     }
 }
