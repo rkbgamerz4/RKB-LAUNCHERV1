@@ -6,22 +6,19 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import net.kdt.pojavlaunch.extra.ExtraConstants;
-import net.kdt.pojavlaunch.extra.ExtraCore;
-import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
 
 public class LauncherActivity extends AppCompatActivity {
@@ -33,6 +30,9 @@ public class LauncherActivity extends AppCompatActivity {
     @Nullable private ImageButton mSettingsButton;
 
     private Runnable mNotificationPermissionCallback;
+
+    // আমরা যে container-এ fragment রাখব, তার ID
+    private int mFragmentContainerId = View.NO_ID;
 
     private final ActivityResultLauncher<String> mNotificationPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
@@ -46,22 +46,28 @@ public class LauncherActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Layout – try common names
+        // ১. Layout সেট করো
         int layoutId = getResources().getIdentifier("activity_launcher", "layout", getPackageName());
         if (layoutId == 0) layoutId = getResources().getIdentifier("activity_main", "layout", getPackageName());
         if (layoutId == 0) layoutId = getResources().getIdentifier("launcher_activity", "layout", getPackageName());
+
         if (layoutId != 0) {
             setContentView(layoutId);
         } else {
-            // Absolute last resort – create empty container
-            android.widget.FrameLayout root = new android.widget.FrameLayout(this);
-            root.setId(android.view.View.generateViewId());
-            root.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            // কোনো layout না পেলে খালি root বানাও
+            FrameLayout root = new FrameLayout(this);
+            root.setId(View.generateViewId());
+            root.setLayoutParams(new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
             setContentView(root);
-            // store generated id for fragment later
-            root.setTag("rkb_root");
+        }
+
+        // ২. Fragment container খুঁজে বের করো (বা বানাও)
+        mFragmentContainerId = findExistingContainer();
+        if (mFragmentContainerId == View.NO_ID) {
+            // কোনো container না থাকলে android.R.id.content ব্যবহার করব
+            mFragmentContainerId = android.R.id.content;
         }
 
         // Mod installer launcher (required by Tools.java)
@@ -79,6 +85,28 @@ public class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    /** Layout-এ আগে থেকে container আছে কিনা চেক করে */
+    private int findExistingContainer() {
+        String[] names = {
+                "container_fragment",
+                "main_fragment",
+                "fragment_container",
+                "content_frame",
+                "fragment_container_view"
+        };
+
+        for (String name : names) {
+            int id = getResources().getIdentifier(name, "id", getPackageName());
+            if (id != 0) {
+                View v = findViewById(id);
+                if (v != null) {
+                    return id; // সত্যিই layout-এ আছে
+                }
+            }
+        }
+        return View.NO_ID;
+    }
+
     private void bindViews() {
         try {
             int accId = getResources().getIdentifier("account_spinner", "id", getPackageName());
@@ -90,28 +118,23 @@ public class LauncherActivity extends AppCompatActivity {
     }
 
     private void openRkbHome() {
-        int containerId = getResources().getIdentifier("container_fragment", "id", getPackageName());
-        if (containerId == 0) containerId = getResources().getIdentifier("main_fragment", "id", getPackageName());
-        if (containerId == 0) containerId = getResources().getIdentifier("fragment_container", "id", getPackageName());
-        if (containerId == 0) containerId = getResources().getIdentifier("content_frame", "id", getPackageName());
-
-        if (containerId != 0) {
-            getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(containerId, new RkbHomeFragment())
-                    .commitAllowingStateLoss();
-            return;
-        }
-
-        // Fallback: use android.R.id.content
         try {
             getSupportFragmentManager()
                     .beginTransaction()
-                    .replace(android.R.id.content, new RkbHomeFragment())
+                    .replace(mFragmentContainerId, new RkbHomeFragment())
                     .commitAllowingStateLoss();
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(this, "RKB Home failed to open", Toast.LENGTH_LONG).show();
+            // শেষ চেষ্টা: android.R.id.content
+            try {
+                getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(android.R.id.content, new RkbHomeFragment())
+                        .commitAllowingStateLoss();
+            } catch (Exception e2) {
+                e2.printStackTrace();
+                Toast.makeText(this, "RKB Home failed to open", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
@@ -184,23 +207,23 @@ public class LauncherActivity extends AppCompatActivity {
     public void swapFragment(Class<? extends Fragment> clazz) {
         try {
             Fragment f = clazz.getDeclaredConstructor().newInstance();
-            int containerId = getResources().getIdentifier("container_fragment", "id", getPackageName());
-            if (containerId == 0) containerId = getResources().getIdentifier("main_fragment", "id", getPackageName());
-            if (containerId == 0) {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(mFragmentContainerId, f)
+                    .addToBackStack(null)
+                    .commitAllowingStateLoss();
+        } catch (Exception e) {
+            e.printStackTrace();
+            try {
+                Fragment f = clazz.getDeclaredConstructor().newInstance();
                 getSupportFragmentManager()
                         .beginTransaction()
                         .replace(android.R.id.content, f)
                         .addToBackStack(null)
                         .commitAllowingStateLoss();
-            } else {
-                getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(containerId, f)
-                        .addToBackStack(null)
-                        .commitAllowingStateLoss();
+            } catch (Exception e2) {
+                e2.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
