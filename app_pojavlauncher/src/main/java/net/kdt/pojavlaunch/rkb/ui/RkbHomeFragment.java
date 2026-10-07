@@ -23,6 +23,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import net.kdt.pojavlaunch.LauncherActivity;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
@@ -62,40 +63,38 @@ public class RkbHomeFragment extends Fragment {
         sideNav.addView(accent, new LinearLayout.LayoutParams(dp(3), dp(22)));
         sideNav.addView(space(ctx, 8));
 
+        // Home (already here)
         sideNav.addView(navItem(ctx, R.drawable.ic_nav_home, true, v -> {}));
         sideNav.addView(space(ctx, 6));
+
+        // Instances
         sideNav.addView(navItem(ctx, R.drawable.ic_nav_instances, false, v ->
-                Toast.makeText(ctx, "Instances", Toast.LENGTH_SHORT).show()));
+                Toast.makeText(ctx, "Instances – coming soon", Toast.LENGTH_SHORT).show()));
         sideNav.addView(space(ctx, 6));
+
+        // Controls
         sideNav.addView(navItem(ctx, R.drawable.ic_nav_controls, false, v ->
-                Toast.makeText(ctx, "Controls", Toast.LENGTH_SHORT).show()));
+                Toast.makeText(ctx, "Controls – coming soon", Toast.LENGTH_SHORT).show()));
         sideNav.addView(space(ctx, 6));
+
+        // Skins
         sideNav.addView(navItem(ctx, R.drawable.ic_nav_skins, false, v ->
-                Toast.makeText(ctx, "Skins", Toast.LENGTH_SHORT).show()));
+                Toast.makeText(ctx, "Skins – coming soon", Toast.LENGTH_SHORT).show()));
         sideNav.addView(space(ctx, 6));
+
+        // About
         sideNav.addView(navItem(ctx, R.drawable.ic_nav_info, false, v ->
-                Toast.makeText(ctx, "About RKB Launcher", Toast.LENGTH_SHORT).show()));
+                Toast.makeText(ctx, "About RKB Launcher\nMade by RKB_GAMERZ", Toast.LENGTH_LONG).show()));
 
         View flex = new View(ctx);
         sideNav.addView(flex, new LinearLayout.LayoutParams(1, 0, 1f));
 
-        sideNav.addView(navItem(ctx, R.drawable.ic_nav_settings, false, v -> {
-            try {
-                int id = getResources().getIdentifier("setting_button", "id", requireContext().getPackageName());
-                if (id != 0) {
-                    View btn = requireActivity().findViewById(id);
-                    if (btn != null) {
-                        btn.performClick();
-                        return;
-                    }
-                }
-            } catch (Exception ignored) {}
-            Toast.makeText(ctx, "Settings", Toast.LENGTH_SHORT).show();
-        }));
+        // Settings – try to open real settings
+        sideNav.addView(navItem(ctx, R.drawable.ic_nav_settings, false, v -> openSettings()));
 
         root.addView(sideNav);
 
-        // ===== MAIN (scrollable so nothing cuts off) =====
+        // ===== MAIN =====
         ScrollView scroll = new ScrollView(ctx);
         scroll.setFillViewport(true);
         scroll.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
@@ -139,7 +138,7 @@ public class RkbHomeFragment extends Fragment {
         topBar.addView(hSpace(ctx, 6));
 
         TextView yt = chip(ctx, "YouTube", YT_RED);
-        yt.setOnClickListener(v -> openUrl("https://youtube.com"));
+        yt.setOnClickListener(v -> openUrl("https://youtube.com/@RKB_GAMERZ"));
         topBar.addView(yt);
         topBar.addView(hSpace(ctx, 4));
 
@@ -161,14 +160,17 @@ public class RkbHomeFragment extends Fragment {
         accTxt.setTypeface(Typeface.DEFAULT_BOLD);
         acc.addView(accTxt);
         acc.setOnClickListener(v -> {
-            try { ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true); }
-            catch (Exception e) { Toast.makeText(ctx, "Accounts", Toast.LENGTH_SHORT).show(); }
+            try {
+                ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true);
+            } catch (Exception e) {
+                Toast.makeText(ctx, "Accounts", Toast.LENGTH_SHORT).show();
+            }
         });
         topBar.addView(acc);
         main.addView(topBar);
         main.addView(space(ctx, 8));
 
-        // --- CENTER: Skin + LAUNCH + Version ---
+        // --- CENTER ---
         LinearLayout center = new LinearLayout(ctx);
         center.setOrientation(LinearLayout.VERTICAL);
         center.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -218,7 +220,7 @@ public class RkbHomeFragment extends Fragment {
         center.addView(skinFrame);
         center.addView(space(ctx, 10));
 
-        // ===== BIG LAUNCH BUTTON (always visible) =====
+        // BIG LAUNCH BUTTON
         TextView launchBtn = new TextView(ctx);
         launchBtn.setText("▶  LAUNCH");
         launchBtn.setTextColor(Color.WHITE);
@@ -240,7 +242,7 @@ public class RkbHomeFragment extends Fragment {
         versionLabel.setBackgroundResource(R.drawable.bg_card);
         versionLabel.setPadding(dp(14), dp(6), dp(14), dp(6));
         versionLabel.setOnClickListener(v ->
-                Toast.makeText(ctx, "Version picker", Toast.LENGTH_SHORT).show());
+                Toast.makeText(ctx, "Version picker – coming soon", Toast.LENGTH_SHORT).show());
         center.addView(versionLabel);
 
         main.addView(center);
@@ -312,7 +314,7 @@ public class RkbHomeFragment extends Fragment {
         newInst.setBackground(dashed);
         newInst.setPadding(dp(12), dp(7), dp(12), dp(7));
         newInst.setOnClickListener(v ->
-                Toast.makeText(ctx, "New Instance", Toast.LENGTH_SHORT).show());
+                Toast.makeText(ctx, "New Instance – coming soon", Toast.LENGTH_SHORT).show());
         bottom.addView(newInst);
 
         main.addView(bottom);
@@ -325,9 +327,38 @@ public class RkbHomeFragment extends Fragment {
     private void doLaunch() {
         try {
             ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+            Toast.makeText(requireContext(), "Launching...", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
-            Toast.makeText(requireContext(), "Launch failed", Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+            Toast.makeText(requireContext(), "Launch failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void openSettings() {
+        try {
+            // Try to open the real Pojav settings fragment
+            if (getActivity() instanceof LauncherActivity) {
+                // Common preference fragment class name in Pojav forks
+                Class<?> prefClass = Class.forName("net.kdt.pojavlaunch.prefs.LauncherPreferenceFragment");
+                ((LauncherActivity) getActivity()).swapFragment((Class<? extends Fragment>) prefClass);
+                return;
+            }
+        } catch (Exception ignored) {}
+
+        // Fallback: try clicking the hidden stock settings button
+        try {
+            int id = getResources().getIdentifier("setting_button", "id", requireContext().getPackageName());
+            if (id == 0) id = getResources().getIdentifier("settings_button", "id", requireContext().getPackageName());
+            if (id != 0) {
+                View btn = requireActivity().findViewById(id);
+                if (btn != null) {
+                    btn.performClick();
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        Toast.makeText(requireContext(), "Settings", Toast.LENGTH_SHORT).show();
     }
 
     private void openUrl(String url) {
