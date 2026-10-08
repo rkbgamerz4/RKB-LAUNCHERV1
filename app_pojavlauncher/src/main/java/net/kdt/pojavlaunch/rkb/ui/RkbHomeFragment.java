@@ -19,8 +19,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import net.kdt.pojavlaunch.R;
-import net.kdt.pojavlaunch.prefs.ExtraConstants;
-import net.kdt.pojavlaunch.prefs.ExtraCore;
+import net.kdt.pojavlaunch.extra.ExtraConstants;
+import net.kdt.pojavlaunch.extra.ExtraCore;
 
 public class RkbHomeFragment extends Fragment {
 
