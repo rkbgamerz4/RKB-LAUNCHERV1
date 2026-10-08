@@ -2,14 +2,14 @@ package net.kdt.pojavlaunch.rkb.ui;
 
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.HorizontalScrollView;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,23 +19,23 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import net.kdt.pojavlaunch.R;
+import net.kdt.pojavlaunch.prefs.ExtraConstants;
+import net.kdt.pojavlaunch.prefs.ExtraCore;
 
 public class RkbHomeFragment extends Fragment {
 
-    private static final int BG = Color.rgb(7, 9, 16);
-    private static final int PANEL = Color.rgb(8, 16, 27);
-    private static final int TEXT = Color.rgb(235, 244, 252);
-    private static final int MUTED = Color.rgb(135, 160, 184);
+    private static final int BG = Color.rgb(5, 7, 12);
+    private static final int PANEL = Color.rgb(7, 13, 22);
+    private static final int PANEL_2 = Color.rgb(9, 18, 30);
     private static final int BLUE = Color.rgb(0, 168, 255);
+    private static final int BLUE_2 = Color.rgb(27, 96, 255);
+    private static final int WHITE = Color.WHITE;
+    private static final int MUTED = Color.rgb(150, 168, 190);
 
-    private LinearLayout content;
-    private TextView homeNav;
-    private TextView cursorNav;
-    private TextView modsNav;
-    private TextView controlsNav;
-    private TextView aboutNav;
-    private TextView skinNav;
-    private TextView settingsNav;
+    private FrameLayout root;
+    private LinearLayout sidebar;
+    private LinearLayout center;
+    private LinearLayout rightPanel;
 
     @Nullable
     @Override
@@ -44,569 +44,910 @@ public class RkbHomeFragment extends Fragment {
             @Nullable ViewGroup container,
             @Nullable Bundle savedInstanceState) {
 
-        LinearLayout root = new LinearLayout(requireContext());
-        root.setOrientation(LinearLayout.HORIZONTAL);
+        root = new FrameLayout(requireContext());
         root.setBackgroundColor(BG);
 
-        // ============================================================
-        // LEFT SIDEBAR
-        // ============================================================
-
-        LinearLayout sidebar = new LinearLayout(requireContext());
-        sidebar.setOrientation(LinearLayout.VERTICAL);
-        sidebar.setGravity(Gravity.CENTER_HORIZONTAL);
-        sidebar.setPadding(dp(10), dp(16), dp(10), dp(12));
-        sidebar.setBackgroundResource(R.drawable.bg_rkb_sidebar);
-
-        root.addView(
-                sidebar,
-                new LinearLayout.LayoutParams(dp(78), -1)
-        );
-
-        // RKB LOGO
-        TextView logo = new TextView(requireContext());
-        logo.setText("RKB");
-        logo.setTextColor(BLUE);
-        logo.setTextSize(21);
-        logo.setTypeface(Typeface.DEFAULT_BOLD);
-        logo.setGravity(Gravity.CENTER);
-        logo.setBackgroundResource(R.drawable.bg_rkb_logo);
-
-        sidebar.addView(
-                logo,
-                new LinearLayout.LayoutParams(dp(56), dp(56))
-        );
-
-        sidebar.addView(space(18));
-
-        homeNav = nav("⌂", "Home");
-        cursorNav = nav("✦", "Cursor");
-        modsNav = nav("M", "Mods");
-        controlsNav = nav("⌁", "Controls");
-        aboutNav = nav("i", "About");
-        skinNav = nav("S", "Skin");
-        settingsNav = nav("⚙", "Settings");
-
-        sidebar.addView(homeNav);
-        sidebar.addView(space(7));
-        sidebar.addView(cursorNav);
-        sidebar.addView(space(7));
-        sidebar.addView(modsNav);
-        sidebar.addView(space(7));
-        sidebar.addView(controlsNav);
-        sidebar.addView(space(7));
-        sidebar.addView(aboutNav);
-        sidebar.addView(space(7));
-        sidebar.addView(skinNav);
-
-        Space sideBottom = new Space(requireContext());
-        sidebar.addView(
-                sideBottom,
-                new LinearLayout.LayoutParams(1, 0, 1)
-        );
-
-        sidebar.addView(settingsNav);
-
-        homeNav.setSelected(true);
-
-        homeNav.setOnClickListener(v -> showHome());
-        cursorNav.setOnClickListener(v -> showPage("CURSOR STUDIO",
-                "Customize your launcher cursor and pointer."));
-        modsNav.setOnClickListener(v -> showPage("MODS",
-                "Manage your installed Minecraft mods."));
-        controlsNav.setOnClickListener(v -> showPage("CONTROLS",
-                "Configure your touch and game controls."));
-        aboutNav.setOnClickListener(v -> showPage("ABOUT",
-                "RKB LAUNCHER — Minecraft Android launcher."));
-        skinNav.setOnClickListener(v -> showPage("SKIN",
-                "Manage your Minecraft skin."));
-        settingsNav.setOnClickListener(v -> showPage("SETTINGS",
-                "Launcher settings and preferences."));
-
-        // ============================================================
-        // MAIN AREA
-        // ============================================================
-
-        ScrollView scroll = new ScrollView(requireContext());
-        scroll.setFillViewport(true);
-        scroll.setBackgroundColor(BG);
-
-        content = new LinearLayout(requireContext());
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(22), dp(18), dp(22), dp(24));
-
-        scroll.addView(content);
-
-        root.addView(
-                scroll,
-                new LinearLayout.LayoutParams(0, -1, 1)
-        );
-
-        showHome();
+        buildUi();
 
         return root;
     }
 
-    // ================================================================
-    // NEW HOME UI
-    // ================================================================
+    private void buildUi() {
 
-    private void showHome() {
+        root.removeAllViews();
 
-        content.removeAllViews();
+        // =========================================================
+        // LEFT SIDEBAR
+        // =========================================================
 
-        // TOP HEADER
-        LinearLayout header = new LinearLayout(requireContext());
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(20), dp(14), dp(18), dp(14));
-        header.setBackgroundResource(R.drawable.bg_rkb_header);
+        sidebar = new LinearLayout(requireContext());
+        sidebar.setOrientation(LinearLayout.VERTICAL);
+        sidebar.setGravity(Gravity.CENTER_HORIZONTAL);
+        sidebar.setPadding(dp(10), dp(14), dp(10), dp(14));
+        sidebar.setBackgroundResource(R.drawable.bg_rkb_sidebar);
 
-        LinearLayout titleBox = new LinearLayout(requireContext());
-        titleBox.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout.LayoutParams sideParams =
+                new FrameLayout.LayoutParams(
+                        dp(78),
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.LEFT
+                );
 
-        TextView title = text("RKB LAUNCHER", 22, TEXT, true);
+        root.addView(sidebar, sideParams);
 
-        TextView subtitle = text(
-                "YOUR MINECRAFT EXPERIENCE",
-                10,
-                MUTED,
+        // HOME
+        addNav(
+                sidebar,
+                R.drawable.ic_rkb_play,
+                true
+        );
+
+        // CURSOR
+        addNav(
+                sidebar,
+                android.R.drawable.ic_menu_crop,
                 false
         );
 
-        titleBox.addView(title);
-        titleBox.addView(space(2));
-        titleBox.addView(subtitle);
-
-        header.addView(
-                titleBox,
-                new LinearLayout.LayoutParams(0, -2, 1)
+        // MODS
+        addNav(
+                sidebar,
+                android.R.drawable.ic_menu_manage,
+                false
         );
 
-        TextView status = text("●  READY", 11,
-                Color.rgb(50, 220, 145), true);
-
-        status.setGravity(Gravity.CENTER);
-        status.setPadding(dp(14), dp(8), dp(14), dp(8));
-        status.setBackgroundResource(R.drawable.bg_rkb_status);
-
-        header.addView(
-                status,
-                new LinearLayout.LayoutParams(-2, dp(38))
+        // CONTROLS
+        addNav(
+                sidebar,
+                android.R.drawable.ic_media_play,
+                false
         );
 
-        content.addView(header);
-
-        content.addView(space(18));
-
-        // ACCOUNT
-        LinearLayout account = new LinearLayout(requireContext());
-        account.setGravity(Gravity.CENTER_VERTICAL);
-        account.setPadding(dp(18), dp(14), dp(18), dp(14));
-        account.setBackgroundResource(R.drawable.bg_rkb_account);
-
-        TextView avatar = text("R", 22, BLUE, true);
-        avatar.setGravity(Gravity.CENTER);
-
-        LinearLayout.LayoutParams avatarParams =
-                new LinearLayout.LayoutParams(dp(52), dp(52));
-
-        account.addView(avatar, avatarParams);
-
-        account.addView(spaceH(14));
-
-        LinearLayout accountInfo = new LinearLayout(requireContext());
-        accountInfo.setOrientation(LinearLayout.VERTICAL);
-
-        accountInfo.addView(
-                text("RKB PLAYER", 16, TEXT, true)
+        // ABOUT
+        addNav(
+                sidebar,
+                android.R.drawable.ic_menu_info_details,
+                false
         );
 
-        accountInfo.addView(space(3));
-
-        accountInfo.addView(
-                text("Microsoft Account", 11, MUTED, false)
+        // SETTINGS
+        addNav(
+                sidebar,
+                android.R.drawable.ic_menu_preferences,
+                false
         );
 
-        account.addView(
-                accountInfo,
-                new LinearLayout.LayoutParams(0, -2, 1)
+        // =========================================================
+        // CENTER
+        // =========================================================
+
+        center = new LinearLayout(requireContext());
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setPadding(
+                dp(18),
+                dp(8),
+                dp(12),
+                dp(10)
         );
 
-        TextView more = new TextView(requireContext());
-        more.setText("•••");
-        more.setTextSize(20);
-        more.setTextColor(MUTED);
-        more.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams centerParams =
+                new FrameLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                );
 
-        account.addView(
-                more,
-                new LinearLayout.LayoutParams(dp(40), dp(48))
+        centerParams.leftMargin = dp(78);
+        centerParams.rightMargin = dp(430);
+
+        root.addView(center, centerParams);
+
+        buildHeader();
+        buildCenterSpace();
+        buildInstanceRow();
+
+        // =========================================================
+        // RIGHT AREA
+        // =========================================================
+
+        rightPanel = new LinearLayout(requireContext());
+        rightPanel.setOrientation(LinearLayout.VERTICAL);
+        rightPanel.setPadding(
+                dp(12),
+                dp(8),
+                dp(18),
+                dp(14)
         );
 
-        content.addView(
-                account,
-                new LinearLayout.LayoutParams(-1, dp(82))
-        );
+        FrameLayout.LayoutParams rightParams =
+                new FrameLayout.LayoutParams(
+                        dp(430),
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.RIGHT
+                );
 
-        content.addView(space(20));
+        root.addView(rightPanel, rightParams);
 
-        // WELCOME
-        content.addView(
-                text("Welcome back, RKB", 27, TEXT, true)
-        );
+        buildAccount();
+        buildPlayerArea();
+    }
 
-        content.addView(space(5));
+    // =============================================================
+    // HEADER
+    // =============================================================
 
-        content.addView(
-                text(
-                        "Select an instance and launch Minecraft.",
-                        13,
-                        MUTED,
-                        false
+    private void buildHeader() {
+
+        LinearLayout header = new LinearLayout(requireContext());
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(8), dp(12), dp(8));
+        header.setBackgroundResource(R.drawable.bg_rkb_header);
+
+        LinearLayout logoBox = new LinearLayout(requireContext());
+        logoBox.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView rLogo = new TextView(requireContext());
+        rLogo.setText("R");
+        rLogo.setTextColor(BLUE);
+        rLogo.setTextSize(25);
+        rLogo.setTypeface(Typeface.DEFAULT_BOLD);
+        rLogo.setGravity(Gravity.CENTER);
+        rLogo.setBackgroundResource(R.drawable.bg_rkb_logo);
+
+        logoBox.addView(
+                rLogo,
+                new LinearLayout.LayoutParams(
+                        dp(52),
+                        dp(52)
                 )
         );
 
-        content.addView(space(18));
+        logoBox.addView(spaceH(10));
 
-        // ============================================================
-        // INSTANCE ROW
-        // ============================================================
+        LinearLayout logoText = new LinearLayout(requireContext());
+        logoText.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout instanceRow = new LinearLayout(requireContext());
-        instanceRow.setOrientation(LinearLayout.HORIZONTAL);
+        TextView launcher = text(
+                "RKB LAUNCHER",
+                18,
+                WHITE,
+                true
+        );
 
+        TextView slogan = text(
+                "PLAY  •  EXPLORE  •  CREATE",
+                8,
+                MUTED,
+                true
+        );
+
+        logoText.addView(launcher);
+        logoText.addView(space(2));
+        logoText.addView(slogan);
+
+        logoBox.addView(logoText);
+
+        header.addView(
+                logoBox,
+                new LinearLayout.LayoutParams(
+                        0,
+                        -1,
+                        1
+                )
+        );
+
+        TextView youtube = smallButton(
+                "YouTube",
+                Color.rgb(235, 35, 45)
+        );
+
+        header.addView(
+                youtube,
+                new LinearLayout.LayoutParams(
+                        dp(118),
+                        dp(46)
+                )
+        );
+
+        header.addView(spaceH(8));
+
+        TextView discord = smallButton(
+                "Discord",
+                Color.rgb(52, 93, 235)
+        );
+
+        header.addView(
+                discord,
+                new LinearLayout.LayoutParams(
+                        dp(118),
+                        dp(46)
+                )
+        );
+
+        center.addView(
+                header,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(76)
+                )
+        );
+    }
+
+    // =============================================================
+    // CENTER EMPTY SPACE
+    // =============================================================
+
+    private void buildCenterSpace() {
+
+        Space space = new Space(requireContext());
+
+        center.addView(
+                space,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        0,
+                        1
+                )
+        );
+    }
+
+    // =============================================================
+    // INSTANCE ROW
+    // =============================================================
+
+    private void buildInstanceRow() {
+
+        LinearLayout row = new LinearLayout(requireContext());
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        // EXISTING INSTANCE
         LinearLayout instance = new LinearLayout(requireContext());
-        instance.setOrientation(LinearLayout.VERTICAL);
-        instance.setPadding(dp(18), dp(16), dp(18), dp(16));
+        instance.setGravity(Gravity.CENTER_VERTICAL);
+        instance.setPadding(
+                dp(10),
+                dp(8),
+                dp(8),
+                dp(8)
+        );
         instance.setBackgroundResource(R.drawable.bg_rkb_instance);
 
-        LinearLayout instanceTop = new LinearLayout(requireContext());
-        instanceTop.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView minecraft = text(
-                "MINECRAFT",
-                17,
-                TEXT,
-                true
-        );
-
-        instanceTop.addView(
-                minecraft,
-                new LinearLayout.LayoutParams(0, -2, 1)
-        );
-
-        TextView version = text(
-                "1.21.1",
-                11,
-                BLUE,
-                true
-        );
-
-        version.setPadding(dp(12), dp(6), dp(12), dp(6));
-        version.setBackgroundResource(R.drawable.bg_rkb_version);
-
-        instanceTop.addView(version);
-
-        instance.addView(instanceTop);
-
-        instance.addView(space(9));
+        TextView accent = new TextView(requireContext());
+        accent.setBackgroundColor(BLUE);
 
         instance.addView(
+                accent,
+                new LinearLayout.LayoutParams(
+                        dp(4),
+                        dp(52)
+                )
+        );
+
+        instance.addView(spaceH(8));
+
+        TextView grass = text(
+                "▣",
+                30,
+                Color.rgb(90, 205, 75),
+                true
+        );
+
+        grass.setGravity(Gravity.CENTER);
+
+        instance.addView(
+                grass,
+                new LinearLayout.LayoutParams(
+                        dp(54),
+                        dp(54)
+                )
+        );
+
+        instance.addView(spaceH(8));
+
+        LinearLayout instanceText =
+                new LinearLayout(requireContext());
+
+        instanceText.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        instanceText.addView(
                 text(
-                        "Fabric • Optimized",
+                        "Minecraft...",
+                        14,
+                        WHITE,
+                        true
+                )
+        );
+
+        instanceText.addView(space(3));
+
+        instanceText.addView(
+                text(
+                        "1.21.11",
                         12,
                         MUTED,
                         false
                 )
         );
 
-        instance.addView(space(13));
-
-        LinearLayout progress = new LinearLayout(requireContext());
-        progress.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView ready = text(
-                "READY TO PLAY",
-                10,
-                Color.rgb(50, 220, 145),
-                true
+        instance.addView(
+                instanceText,
+                new LinearLayout.LayoutParams(
+                        dp(120),
+                        -2
+                )
         );
 
-        progress.addView(
-                ready,
-                new LinearLayout.LayoutParams(0, -2, 1)
+        instance.addView(spaceH(8));
+
+        ImageView play = new ImageView(requireContext());
+        play.setImageResource(R.drawable.ic_rkb_play);
+        play.setPadding(dp(9), dp(9), dp(9), dp(9));
+        play.setBackgroundResource(
+                R.drawable.bg_rkb_nav_item
         );
 
-        TextView arrow = text("›", 24, BLUE, false);
-        progress.addView(arrow);
-
-        instance.addView(progress);
-
-        instance.setOnClickListener(v ->
-                Toast.makeText(
-                        requireContext(),
-                        "Minecraft 1.21.1 selected",
-                        Toast.LENGTH_SHORT
-                ).show()
+        play.setOnClickListener(
+                v -> launchMinecraft()
         );
 
-        instanceRow.addView(
+        instance.addView(
+                play,
+                new LinearLayout.LayoutParams(
+                        dp(52),
+                        dp(52)
+                )
+        );
+
+        instance.addView(spaceH(4));
+
+        TextView more = text(
+                "⋮",
+                25,
+                WHITE,
+                false
+        );
+
+        more.setGravity(Gravity.CENTER);
+
+        instance.addView(
+                more,
+                new LinearLayout.LayoutParams(
+                        dp(34),
+                        dp(52)
+                )
+        );
+
+        row.addView(
                 instance,
-                new LinearLayout.LayoutParams(0, dp(150), 1)
+                new LinearLayout.LayoutParams(
+                        dp(340),
+                        dp(82)
+                )
         );
 
-        instanceRow.addView(spaceH(12));
+        row.addView(spaceH(18));
 
         // NEW INSTANCE
-        LinearLayout newInstance = new LinearLayout(requireContext());
-        newInstance.setOrientation(LinearLayout.VERTICAL);
-        newInstance.setGravity(Gravity.CENTER);
-        newInstance.setBackgroundResource(R.drawable.bg_rkb_new_instance);
+        LinearLayout newInstance =
+                new LinearLayout(requireContext());
 
-        ImageView add = new ImageView(requireContext());
-        add.setImageResource(R.drawable.ic_rkb_add);
+        newInstance.setGravity(Gravity.CENTER);
+        newInstance.setBackgroundResource(
+                R.drawable.bg_rkb_new_instance
+        );
+
+        ImageView plus = new ImageView(requireContext());
+        plus.setImageResource(
+                R.drawable.ic_rkb_add
+        );
 
         newInstance.addView(
-                add,
-                new LinearLayout.LayoutParams(dp(34), dp(34))
+                plus,
+                new LinearLayout.LayoutParams(
+                        dp(30),
+                        dp(30)
+                )
         );
 
-        newInstance.addView(space(8));
+        newInstance.addView(spaceH(9));
 
-        TextView newText = text(
-                "NEW INSTANCE",
-                11,
-                BLUE,
-                true
+        newInstance.addView(
+                text(
+                        "New Instance",
+                        12,
+                        BLUE,
+                        true
+                )
         );
 
-        newInstance.addView(newText);
-
-        newInstance.setOnClickListener(v ->
-                Toast.makeText(
-                        requireContext(),
-                        "New instance",
-                        Toast.LENGTH_SHORT
-                ).show()
-        );
-
-        instanceRow.addView(
+        row.addView(
                 newInstance,
-                new LinearLayout.LayoutParams(dp(145), dp(150))
+                new LinearLayout.LayoutParams(
+                        dp(290),
+                        dp(82)
+                )
         );
 
-        content.addView(instanceRow);
+        center.addView(
+                row,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(94)
+                )
+        );
+    }
 
-        content.addView(space(20));
+    // =============================================================
+    // ACCOUNT
+    // =============================================================
 
-        // ============================================================
-        // LAUNCH AREA
-        // ============================================================
+    private void buildAccount() {
 
-        LinearLayout launchCard = new LinearLayout(requireContext());
-        launchCard.setOrientation(LinearLayout.VERTICAL);
-        launchCard.setGravity(Gravity.CENTER);
-        launchCard.setPadding(dp(20), dp(20), dp(20), dp(20));
-        launchCard.setBackgroundResource(R.drawable.bg_rkb_card);
+        LinearLayout account =
+                new LinearLayout(requireContext());
 
-        TextView selected = text(
-                "MINECRAFT 1.21.1",
-                12,
-                MUTED,
-                true
+        account.setGravity(Gravity.CENTER_VERTICAL);
+        account.setPadding(
+                dp(14),
+                dp(8),
+                dp(10),
+                dp(8)
         );
 
-        launchCard.addView(selected);
+        account.setBackgroundResource(
+                R.drawable.bg_rkb_account
+        );
 
-        launchCard.addView(space(12));
-
-        TextView launch = text(
-                "LAUNCH",
+        TextView avatar = text(
+                "R",
                 18,
-                Color.WHITE,
+                WHITE,
                 true
         );
 
-        launch.setGravity(Gravity.CENTER);
-        launch.setBackgroundResource(R.drawable.bg_rkb_launch);
-        launch.setCompoundDrawablesWithIntrinsicBounds(
-                R.drawable.ic_rkb_play,
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setBackground(
+                rounded(
+                        Color.rgb(35, 35, 43),
+                        18
+                )
+        );
+
+        account.addView(
+                avatar,
+                new LinearLayout.LayoutParams(
+                        dp(46),
+                        dp(46)
+                )
+        );
+
+        account.addView(spaceH(12));
+
+        account.addView(
+                text(
+                        "RKB_GAMERZ",
+                        17,
+                        WHITE,
+                        true
+                )
+        );
+
+        account.addView(spaceH(12));
+
+        TextView local = text(
+                "LOCAL",
+                11,
+                Color.rgb(190, 150, 255),
+                true
+        );
+
+        local.setGravity(Gravity.CENTER);
+        local.setPadding(
+                dp(9),
                 0,
-                0,
+                dp(9),
                 0
         );
-        launch.setCompoundDrawablePadding(dp(10));
 
-        launch.setOnClickListener(v -> launchMinecraft());
+        local.setBackground(
+                rounded(
+                        Color.rgb(50, 35, 82),
+                        14
+                )
+        );
 
-        launchCard.addView(
+        account.addView(
+                local,
+                new LinearLayout.LayoutParams(
+                        dp(66),
+                        dp(34)
+                )
+        );
+
+        account.addView(spaceH(4));
+
+        account.addView(
+                text(
+                        "▼",
+                        11,
+                        MUTED,
+                        true
+                )
+        );
+
+        rightPanel.addView(
+                account,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(70)
+                )
+        );
+    }
+
+    // =============================================================
+    // PLAYER + LAUNCH
+    // =============================================================
+
+    private void buildPlayerArea() {
+
+        LinearLayout player =
+                new LinearLayout(requireContext());
+
+        player.setOrientation(
+                LinearLayout.VERTICAL
+        );
+        player.setGravity(Gravity.CENTER_HORIZONTAL);
+        player.setPadding(
+                dp(18),
+                dp(18),
+                dp(18),
+                dp(10)
+        );
+
+        // PLAYER LABEL
+        TextView label = text(
+                "Player",
+                17,
+                WHITE,
+                true
+        );
+
+        label.setGravity(Gravity.CENTER);
+        label.setPadding(
+                dp(18),
+                dp(8),
+                dp(18),
+                dp(8)
+        );
+
+        label.setBackgroundResource(
+                R.drawable.bg_rkb_version
+        );
+
+        player.addView(
+                label,
+                new LinearLayout.LayoutParams(
+                        dp(112),
+                        dp(48)
+                )
+        );
+
+        player.addView(space(12));
+
+        // SIMPLE PLAYER PREVIEW
+        LinearLayout skin =
+                createPlayerPreview();
+
+        player.addView(
+                skin,
+                new LinearLayout.LayoutParams(
+                        dp(150),
+                        dp(205)
+                )
+        );
+
+        player.addView(space(6));
+
+        // LAUNCH BUTTON
+        TextView launch =
+                new TextView(requireContext());
+
+        launch.setText("▶  LAUNCH");
+        launch.setTextSize(22);
+        launch.setTextColor(WHITE);
+        launch.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+        launch.setGravity(Gravity.CENTER);
+        launch.setBackgroundResource(
+                R.drawable.bg_rkb_launch
+        );
+
+        launch.setOnClickListener(
+                v -> launchMinecraft()
+        );
+
+        player.addView(
                 launch,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(64)
+                        dp(78)
                 )
         );
 
-        content.addView(
-                launchCard,
-                new LinearLayout.LayoutParams(-1, dp(140))
+        player.addView(space(14));
+
+        // VERSION SELECTOR
+        LinearLayout version =
+                new LinearLayout(requireContext());
+
+        version.setGravity(Gravity.CENTER_VERTICAL);
+        version.setPadding(
+                dp(18),
+                0,
+                dp(16),
+                0
         );
 
-        content.addView(space(18));
-
-        // BOTTOM INFO
-        LinearLayout infoRow = new LinearLayout(requireContext());
-
-        infoRow.addView(
-                infoCard("VERSION", "RKB Launcher 1.0"),
-                new LinearLayout.LayoutParams(0, dp(82), 1)
+        version.setBackgroundResource(
+                R.drawable.bg_rkb_version
         );
 
-        infoRow.addView(spaceH(10));
+        ImageView vPlay =
+                new ImageView(requireContext());
 
-        infoRow.addView(
-                infoCard("ENGINE", "Pojav Engine"),
-                new LinearLayout.LayoutParams(0, dp(82), 1)
+        vPlay.setImageResource(
+                R.drawable.ic_rkb_play
         );
 
-        infoRow.addView(spaceH(10));
-
-        infoRow.addView(
-                infoCard("STATUS", "Optimized"),
-                new LinearLayout.LayoutParams(0, dp(82), 1)
+        version.addView(
+                vPlay,
+                new LinearLayout.LayoutParams(
+                        dp(28),
+                        dp(28)
+                )
         );
 
-        content.addView(infoRow);
-    }
+        version.addView(spaceH(12));
 
-    // ================================================================
-    // OTHER PAGES
-    // ================================================================
-
-    private void showPage(String title, String description) {
-
-        content.removeAllViews();
-
-        TextView heading = text(title, 28, TEXT, true);
-        content.addView(heading);
-
-        content.addView(space(6));
-
-        content.addView(
-                text(description, 13, MUTED, false)
-        );
-
-        content.addView(space(22));
-
-        LinearLayout card = new LinearLayout(requireContext());
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(22), dp(22), dp(22), dp(22));
-        card.setBackgroundResource(R.drawable.bg_rkb_card);
-
-        card.addView(
-                text(title + " PANEL", 18, TEXT, true)
-        );
-
-        card.addView(space(10));
-
-        card.addView(
+        TextView versionName =
                 text(
-                        "This section is ready for the real launcher functionality.",
-                        13,
-                        MUTED,
-                        false
+                        "Minecraft 1.21.1",
+                        17,
+                        WHITE,
+                        true
+                );
+
+        version.addView(
+                versionName,
+                new LinearLayout.LayoutParams(
+                        0,
+                        -2,
+                        1
                 )
         );
 
-        content.addView(card);
+        ImageView down =
+                new ImageView(requireContext());
+
+        down.setImageResource(
+                R.drawable.ic_rkb_chevron_down
+        );
+
+        version.addView(
+                down,
+                new LinearLayout.LayoutParams(
+                        dp(28),
+                        dp(28)
+                )
+        );
+
+        player.addView(
+                version,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(58)
+                )
+        );
+
+        rightPanel.addView(
+                player,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        0,
+                        1
+                )
+        );
     }
 
-    // ================================================================
+    // =============================================================
+    // PLAYER PREVIEW
+    // =============================================================
+
+    private LinearLayout createPlayerPreview() {
+
+        LinearLayout wrapper =
+                new LinearLayout(requireContext());
+
+        wrapper.setOrientation(
+                LinearLayout.VERTICAL
+        );
+        wrapper.setGravity(Gravity.CENTER);
+
+        // HEAD
+        TextView head = text(
+                "■",
+                64,
+                Color.rgb(205, 150, 105),
+                true
+        );
+
+        head.setGravity(Gravity.CENTER);
+
+                wrapper.addView(
+                head,
+                new LinearLayout.LayoutParams(
+                        dp(70),
+                        dp(62)
+                )
+        );
+
+        // BODY
+        LinearLayout body =
+                new LinearLayout(requireContext());
+
+        body.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
+
+        body.setGravity(Gravity.CENTER);
+
+        TextView leftArm = text(
+                "█",
+                42,
+                Color.rgb(20, 28, 40),
+                true
+        );
+
+        TextView torso = text(
+                "██",
+                50,
+                Color.rgb(24, 70, 125),
+                true
+        );
+
+        TextView rightArm = text(
+                "█",
+                42,
+                Color.rgb(20, 28, 40),
+                true
+        );
+
+        body.addView(leftArm);
+        body.addView(torso);
+        body.addView(rightArm);
+
+        wrapper.addView(
+                body,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(58)
+                )
+        );
+
+        // LEGS
+        LinearLayout legs =
+                new LinearLayout(requireContext());
+
+        legs.setGravity(Gravity.CENTER);
+
+        TextView leftLeg = text(
+                "█",
+                45,
+                Color.rgb(15, 35, 75),
+                true
+        );
+
+        TextView rightLeg = text(
+                "█",
+                45,
+                Color.rgb(15, 35, 75),
+                true
+        );
+
+        legs.addView(leftLeg);
+        legs.addView(rightLeg);
+
+        wrapper.addView(
+                legs,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(58)
+                )
+        );
+
+        return wrapper;
+    }
+
+    // =============================================================
     // NAV ITEM
-    // ================================================================
+    // =============================================================
 
-    private TextView nav(String icon, String name) {
+    private void addNav(
+            LinearLayout parent,
+            int iconRes,
+            boolean active) {
 
-        TextView item = new TextView(requireContext());
+        ImageView item =
+                new ImageView(requireContext());
 
-        item.setText(icon);
-        item.setTextSize(20);
-        item.setTextColor(TEXT);
-        item.setGravity(Gravity.CENTER);
-        item.setTypeface(Typeface.DEFAULT_BOLD);
-        item.setBackgroundResource(R.drawable.bg_rkb_nav_item_active);
+        item.setImageResource(iconRes);
 
-        item.setContentDescription(name);
-
-        item.setOnClickListener(v -> {
-            homeNav.setSelected(false);
-            cursorNav.setSelected(false);
-            modsNav.setSelected(false);
-            controlsNav.setSelected(false);
-            aboutNav.setSelected(false);
-            skinNav.setSelected(false);
-            settingsNav.setSelected(false);
-
-            v.setSelected(true);
-        });
-
-        return item;
-    }
-
-    // ================================================================
-    // INFO CARD
-    // ================================================================
-
-    private View infoCard(String title, String value) {
-
-        LinearLayout card = new LinearLayout(requireContext());
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(15), dp(10), dp(15), dp(10));
-        card.setBackgroundResource(R.drawable.bg_rkb_card);
-
-        card.addView(
-                text(title, 9, MUTED, true)
+        item.setPadding(
+                dp(13),
+                dp(13),
+                dp(13),
+                dp(13)
         );
 
-        card.addView(space(4));
-
-        card.addView(
-                text(value, 12, TEXT, true)
+        item.setBackgroundResource(
+                active
+                        ? R.drawable.bg_rkb_nav_item_active
+                        : R.drawable.bg_rkb_nav_item
         );
 
-        return card;
+        parent.addView(
+                item,
+                new LinearLayout.LayoutParams(
+                        dp(56),
+                        dp(56)
+                )
+        );
+
+        parent.addView(
+                space(10)
+        );
     }
 
-    // ================================================================
+    // =============================================================
+    // HEADER BUTTON
+    // =============================================================
+
+    private TextView smallButton(
+            String name,
+            int color) {
+
+        TextView button =
+                text(
+                        name,
+                        13,
+                        WHITE,
+                        true
+                );
+
+        button.setGravity(Gravity.CENTER);
+
+        button.setBackground(
+                rounded(
+                        color,
+                        24
+                )
+        );
+
+        return button;
+    }
+
+    // =============================================================
     // LAUNCH
-    // ================================================================
+    // =============================================================
 
     private void launchMinecraft() {
 
         try {
 
-            Class<?> extraCore =
-                    Class.forName("net.kdt.pojavlaunch.prefs.ExtraCore");
-
-            Class<?> extraConstants =
-                    Class.forName("net.kdt.pojavlaunch.prefs.ExtraConstants");
-
-            java.lang.reflect.Field field =
-                    extraConstants.getField("LAUNCH_GAME");
-
-            Object launchKey = field.get(null);
-
-            java.lang.reflect.Method method =
-                    extraCore.getMethod(
-                            "setValue",
-                            launchKey.getClass(),
-                            boolean.class
-                    );
-
-            method.invoke(
-                    null,
-                    launchKey,
+            ExtraCore.setValue(
+                    ExtraConstants.LAUNCH_GAME,
                     true
             );
 
@@ -614,15 +955,15 @@ public class RkbHomeFragment extends Fragment {
 
             Toast.makeText(
                     requireContext(),
-                    "Launch system is not connected yet",
+                    "Unable to start Minecraft",
                     Toast.LENGTH_SHORT
             ).show();
         }
     }
 
-    // ================================================================
-    // UI HELPERS
-    // ================================================================
+    // =============================================================
+    // TEXT
+    // =============================================================
 
     private TextView text(
             String value,
@@ -630,40 +971,91 @@ public class RkbHomeFragment extends Fragment {
             int color,
             boolean bold) {
 
-        TextView t = new TextView(requireContext());
+        TextView t =
+                new TextView(requireContext());
 
         t.setText(value);
         t.setTextSize(size);
         t.setTextColor(color);
 
         if (bold) {
-            t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            t.setTypeface(
+                    Typeface.DEFAULT,
+                    Typeface.BOLD
+            );
         }
 
         return t;
     }
 
-    private Space space(int dp) {
-        Space s = new Space(requireContext());
+    // =============================================================
+    // VERTICAL SPACE
+    // =============================================================
+
+    private Space space(int value) {
+
+        Space s =
+                new Space(requireContext());
+
         s.setLayoutParams(
-                new LinearLayout.LayoutParams(1, dp(dp))
+                new LinearLayout.LayoutParams(
+                        1,
+                        dp(value)
+                )
         );
+
         return s;
     }
 
-    private Space spaceH(int dp) {
-        Space s = new Space(requireContext());
+    // =============================================================
+    // HORIZONTAL SPACE
+    // =============================================================
+
+    private Space spaceH(int value) {
+
+        Space s =
+                new Space(requireContext());
+
         s.setLayoutParams(
-                new LinearLayout.LayoutParams(dp(dp), 1)
+                new LinearLayout.LayoutParams(
+                        dp(value),
+                        1
+                )
         );
+
         return s;
     }
+
+    // =============================================================
+    // ROUNDED BACKGROUND
+    // =============================================================
+
+    private GradientDrawable rounded(
+            int color,
+            int radius) {
+
+        GradientDrawable drawable =
+                new GradientDrawable();
+
+        drawable.setColor(color);
+        drawable.setCornerRadius(
+                dp(radius)
+        );
+
+        return drawable;
+    }
+
+    // =============================================================
+    // DP
+    // =============================================================
 
     private int dp(int value) {
+
         return Math.round(
-                value * getResources()
-                        .getDisplayMetrics()
-                        .density
+                value *
+                        getResources()
+                                .getDisplayMetrics()
+                                .density
         );
     }
 }
