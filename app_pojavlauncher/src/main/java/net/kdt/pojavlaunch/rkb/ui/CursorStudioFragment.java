@@ -37,7 +37,7 @@ public class CursorStudioFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 28, 32, 28);
+        root.setPadding(dp(16), dp(14), dp(16), dp(24));
         root.setBackgroundColor(0xFF05080F);
 
         TextView title = new TextView(requireContext());
