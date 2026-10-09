@@ -1135,8 +1135,10 @@ public final class Tools {
     }
 
     public static void backToMainMenu(FragmentActivity fragmentActivity) {
-        fragmentActivity.getSupportFragmentManager()
-                .popBackStack("ROOT", 0);
+        // Home is the root fragment and has no back-stack entry, so pop everything above it.
+        // (The old "ROOT" entry was never created, which left login/profile screens stuck.)
+        androidx.fragment.app.FragmentManager fm = fragmentActivity.getSupportFragmentManager();
+        if (!fm.isStateSaved()) fm.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
     }
 
     /** Remove the current fragment */

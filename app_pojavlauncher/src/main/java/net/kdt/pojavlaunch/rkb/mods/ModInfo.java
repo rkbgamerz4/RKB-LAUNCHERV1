@@ -8,6 +8,11 @@ public class ModInfo {
     public String absolutePath;
     public String displayName;
     public boolean enabled;
+    /** Read from the jar's own metadata (fabric.mod.json / quilt.mod.json / mods.toml / mcmod.info). May be null. */
+    public String metaName;
+    public String version;
+    public String description;
+    public long sizeBytes;
 
     public ModInfo(String fileName, String absolutePath, boolean enabled) {
         this.fileName = fileName;

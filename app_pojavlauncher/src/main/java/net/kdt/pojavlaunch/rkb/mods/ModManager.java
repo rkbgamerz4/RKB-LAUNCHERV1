@@ -3,6 +3,14 @@ package net.kdt.pojavlaunch.rkb.mods;
 import android.util.Log;
 
 import java.io.File;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -148,5 +156,82 @@ public final class ModManager {
 
     public static void prepareForLaunch(File gameDir) {
         Log.d(TAG, "prepareForLaunch: " + listMods(gameDir).size() + " mods scanned");
+    }
+
+    // ---------------------------------------------------------------- metadata (read-only)
+
+    /**
+     * Fills name/version/description from the jar itself. Blocking disk work: call off the main thread.
+     * Only values actually present in the jar are set; nothing is guessed.
+     */
+    public static void readMeta(ModInfo mod) {
+        if (mod == null) return;
+        File f = new File(mod.absolutePath);
+        mod.sizeBytes = f.length();
+        try (ZipFile zip = new ZipFile(f)) {
+            String json = readEntry(zip, "fabric.mod.json");
+            if (json == null) json = readEntry(zip, "quilt.mod.json");
+            if (json != null) {
+                JSONObject o = new JSONObject(json);
+                if (o.has("quilt_loader")) {
+                    JSONObject q = o.getJSONObject("quilt_loader");
+                    mod.version = q.optString("version", null);
+                    JSONObject md = q.optJSONObject("metadata");
+                    if (md != null) {
+                        mod.metaName = md.optString("name", null);
+                        mod.description = md.optString("description", null);
+                    }
+                } else {
+                    mod.metaName = o.optString("name", null);
+                    mod.version = o.optString("version", null);
+                    mod.description = o.optString("description", null);
+                }
+            } else {
+                String toml = readEntry(zip, "META-INF/mods.toml");
+                if (toml == null) toml = readEntry(zip, "META-INF/neoforge.mods.toml");
+                if (toml != null) {
+                    mod.metaName = tomlValue(toml, "displayName");
+                    mod.version = tomlValue(toml, "version");
+                    mod.description = tomlValue(toml, "description");
+                } else {
+                    String legacy = readEntry(zip, "mcmod.info");
+                    if (legacy != null) {
+                        JSONObject o = legacy.trim().startsWith("[")
+                                ? new JSONArray(legacy).getJSONObject(0)
+                                : new JSONObject(legacy).getJSONArray("modList").getJSONObject(0);
+                        mod.metaName = o.optString("name", null);
+                        mod.version = o.optString("version", null);
+                        mod.description = o.optString("description", null);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "readMeta failed for " + mod.fileName + ": " + e);
+        }
+        if (mod.version != null && (mod.version.contains("${") || mod.version.trim().isEmpty())) mod.version = null;
+        if (mod.metaName != null && mod.metaName.trim().isEmpty()) mod.metaName = null;
+        if (mod.description != null) {
+            mod.description = mod.description.trim().replaceAll("\\s+", " ");
+            if (mod.description.isEmpty()) mod.description = null;
+        }
+    }
+
+    private static String readEntry(ZipFile zip, String name) throws Exception {
+        ZipEntry e = zip.getEntry(name);
+        if (e == null || e.getSize() > 512 * 1024) return null;
+        try (InputStream in = zip.getInputStream(e)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            return out.toString("UTF-8");
+        }
+    }
+
+    private static String tomlValue(String toml, String key) {
+        Matcher m = Pattern.compile("(?m)^\\s*" + key + "\\s*=\\s*(?:\\'\\'\\'([\\s\\S]*?)\\'\\'\\'|\"\"\"([\\s\\S]*?)\"\"\"|\"([^\"]*)\")").matcher(toml);
+        if (!m.find()) return null;
+        for (int i = 1; i <= 3; i++) if (m.group(i) != null) return m.group(i);
+        return null;
     }
 }

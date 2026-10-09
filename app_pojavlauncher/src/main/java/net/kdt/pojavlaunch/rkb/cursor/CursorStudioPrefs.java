@@ -1,95 +1,158 @@
 package net.kdt.pojavlaunch.rkb.cursor;
 
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 
+import androidx.annotation.NonNull;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
+
+import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 
 /**
- * RKB Cursor Studio preferences.
- * Style / color / size / opacity for the virtual mouse cursor preview & scale.
- * Size is applied on top of LauncherPreferences.PREF_MOUSESCALE when loading.
+ * RKB Cursor Studio preferences + drawable factory.
+ *
+ * The SAME factory is used by the Cursor Studio preview and by the in-game virtual mouse
+ * ({@code Touchpad}), so what the preview shows is what the touchpad cursor draws.
+ * Defaults (classic / 100% / 100%) reproduce the original PojavLauncher pointer exactly.
  */
 public final class CursorStudioPrefs {
-    public static final String PREF_FILE_HINT = "pojav_settings"; // uses DEFAULT_PREF
-
-    public static final String KEY_STYLE = "rkb_cursor_style";       // classic | pulse | gamepad | custom
-    public static final String KEY_COLOR = "rkb_cursor_color";       // ARGB int as hex string e.g. #00B4FF
+    public static final String KEY_STYLE = "rkb_cursor_style";
+    public static final String KEY_COLOR = "rkb_cursor_color";       // #RRGGBB
     public static final String KEY_SIZE = "rkb_cursor_size";         // 50..150 percent
     public static final String KEY_OPACITY = "rkb_cursor_opacity";   // 20..100 percent
 
-    public static final String STYLE_CLASSIC = "classic";
-    public static final String STYLE_PULSE = "pulse";
-    public static final String STYLE_GAMEPAD = "gamepad";
-    public static final String STYLE_CUSTOM = "custom";
+    public static final String STYLE_CLASSIC = "classic";     // original launcher pointer, never tinted
+    public static final String STYLE_NEON = "neon";           // arrow tinted with the chosen color
+    public static final String STYLE_CROSSHAIR = "crosshair";
+    public static final String STYLE_DOT = "dot";
+    public static final String STYLE_RING = "ring";
 
-    public static final String DEFAULT_COLOR = "#00B4FF";
+    public static final String DEFAULT_COLOR = "#00A8FF";
     public static final int DEFAULT_SIZE = 100;
     public static final int DEFAULT_OPACITY = 100;
 
     private CursorStudioPrefs() {}
 
     private static SharedPreferences prefs() {
-        return LauncherPreferences.DEFAULT_PREF;
+        return LauncherPreferences.DEFAULT_PREF; // may be null very early; callers guard via the getters
+    }
+
+    public static String normalizeStyle(String s) {
+        if (STYLE_NEON.equals(s) || STYLE_CROSSHAIR.equals(s) || STYLE_DOT.equals(s) || STYLE_RING.equals(s)) return s;
+        return STYLE_CLASSIC; // also maps the legacy values (pulse/gamepad/custom) that were never rendered
     }
 
     public static String getStyle() {
-        return prefs().getString(KEY_STYLE, STYLE_PULSE);
-    }
-
-    public static void setStyle(String style) {
-        prefs().edit().putString(KEY_STYLE, style).apply();
+        SharedPreferences p = prefs();
+        return p == null ? STYLE_CLASSIC : normalizeStyle(p.getString(KEY_STYLE, STYLE_CLASSIC));
     }
 
     public static String getColorHex() {
-        return prefs().getString(KEY_COLOR, DEFAULT_COLOR);
-    }
-
-    public static void setColorHex(String hex) {
-        prefs().edit().putString(KEY_COLOR, hex).apply();
+        SharedPreferences p = prefs();
+        return p == null ? DEFAULT_COLOR : p.getString(KEY_COLOR, DEFAULT_COLOR);
     }
 
     public static int getSizePercent() {
-        return prefs().getInt(KEY_SIZE, DEFAULT_SIZE);
-    }
-
-    public static void setSizePercent(int percent) {
-        int p = Math.max(50, Math.min(150, percent));
-        prefs().edit().putInt(KEY_SIZE, p).apply();
+        SharedPreferences p = prefs();
+        return p == null ? DEFAULT_SIZE : clamp(p.getInt(KEY_SIZE, DEFAULT_SIZE), 50, 150);
     }
 
     public static int getOpacityPercent() {
-        return prefs().getInt(KEY_OPACITY, DEFAULT_OPACITY);
+        SharedPreferences p = prefs();
+        return p == null ? DEFAULT_OPACITY : clamp(p.getInt(KEY_OPACITY, DEFAULT_OPACITY), 20, 100);
     }
 
-    public static void setOpacityPercent(int percent) {
-        int p = Math.max(20, Math.min(100, percent));
-        prefs().edit().putInt(KEY_OPACITY, p).apply();
+    public static float getSizeMultiplier() { return getSizePercent() / 100f; }
+    public static float getOpacity() { return getOpacityPercent() / 100f; }
+
+    public static int getColorArgb() { return parseColor(getColorHex()); }
+
+    public static void save(String style, String colorHex, int sizePercent, int opacityPercent) {
+        SharedPreferences p = prefs();
+        if (p == null) return;
+        p.edit()
+                .putString(KEY_STYLE, normalizeStyle(style))
+                .putString(KEY_COLOR, colorHex)
+                .putInt(KEY_SIZE, clamp(sizePercent, 50, 150))
+                .putInt(KEY_OPACITY, clamp(opacityPercent, 20, 100))
+                .apply();
+    }
+
+    public static void resetToDefaults() {
+        save(STYLE_CLASSIC, DEFAULT_COLOR, DEFAULT_SIZE, DEFAULT_OPACITY);
+    }
+
+    public static int parseColor(String hex) {
+        try {
+            String h = hex.startsWith("#") ? hex.substring(1) : hex;
+            if (h.length() == 6) return 0xFF000000 | Integer.parseInt(h, 16);
+            if (h.length() == 8) return (int) Long.parseLong(h, 16);
+        } catch (Exception ignored) { }
+        return 0xFF00A8FF;
+    }
+
+    private static int clamp(int v, int lo, int hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    // ---------------------------------------------------------------- drawables
+
+    /** Symmetric styles draw centred on the pointer position; arrows draw from their tip. */
+    public static boolean isCentered(String style) {
+        return STYLE_CROSSHAIR.equals(style) || STYLE_DOT.equals(style) || STYLE_RING.equals(style);
+    }
+
+    /** Builds a fresh (mutable, un-shared) drawable. Never returns null. */
+    @NonNull
+    public static Drawable createDrawable(@NonNull Context c, String style, int argb, int opacityPercent) {
+        style = normalizeStyle(style);
+        Drawable d;
+        switch (style) {
+            case STYLE_NEON: {
+                Drawable outline = ResourcesCompat.getDrawable(c.getResources(), R.drawable.ic_rkb_cursor_arrow_outline, c.getTheme());
+                Drawable fill = ResourcesCompat.getDrawable(c.getResources(), R.drawable.ic_rkb_cursor_arrow_fill, c.getTheme());
+                Drawable fillWrapped = DrawableCompat.wrap(fill.mutate());
+                DrawableCompat.setTint(fillWrapped, argb);
+                d = new LayerDrawable(new Drawable[]{outline.mutate(), fillWrapped});
+                break;
+            }
+            case STYLE_CROSSHAIR:
+                d = tinted(c, R.drawable.ic_rkb_cursor_crosshair, argb);
+                break;
+            case STYLE_DOT:
+                d = tinted(c, R.drawable.ic_rkb_cursor_dot, argb);
+                break;
+            case STYLE_RING:
+                d = tinted(c, R.drawable.ic_rkb_cursor_ring, argb);
+                break;
+            case STYLE_CLASSIC:
+            default:
+                d = ResourcesCompat.getDrawable(c.getResources(), R.drawable.ic_mouse_pointer, c.getTheme());
+                break;
+        }
+        d.mutate().setAlpha(Math.round(255 * clamp(opacityPercent, 20, 100) / 100f));
+        return d;
+    }
+
+    private static Drawable tinted(Context c, int res, int argb) {
+        Drawable base = ResourcesCompat.getDrawable(c.getResources(), res, c.getTheme());
+        Drawable w = DrawableCompat.wrap(base.mutate());
+        DrawableCompat.setTint(w, argb);
+        return w;
     }
 
     /**
-     * Multiplier for mouse pointer drawable scale (0.5 .. 1.5).
-     * Combine with PREF_MOUSESCALE in UI code when drawing the cursor.
+     * @param scale final multiplier (PREF_MOUSESCALE * size%). Arrow tip stays at (0,0); symmetric
+     *              styles are centred on (0,0) so the click point is their middle.
      */
-    public static float getSizeMultiplier() {
-        return getSizePercent() / 100f;
-    }
-
-    public static float getOpacity() {
-        return getOpacityPercent() / 100f;
-    }
-
-    /** Parse stored color; falls back to neon blue. */
-    public static int getColorArgb() {
-        try {
-            String hex = getColorHex();
-            if (hex.startsWith("#")) hex = hex.substring(1);
-            if (hex.length() == 6) {
-                return 0xFF000000 | Integer.parseInt(hex, 16);
-            }
-            if (hex.length() == 8) {
-                return (int) Long.parseLong(hex, 16);
-            }
-        } catch (Exception ignored) {}
-        return 0xFF00B4FF;
+    public static void applyBounds(@NonNull Drawable d, String style, float scale) {
+        if (isCentered(normalizeStyle(style))) {
+            int half = Math.round(20 * scale);
+            d.setBounds(-half, -half, half, half);
+        } else {
+            d.setBounds(0, 0, Math.round(36 * scale), Math.round(54 * scale));
+        }
     }
 }

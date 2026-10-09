@@ -1,22 +1,28 @@
 package net.kdt.pojavlaunch.rkb.ui;
 
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.app.AlertDialog;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
@@ -26,315 +32,463 @@ import net.kdt.pojavlaunch.value.launcherprofiles.LauncherProfiles;
 import net.kdt.pojavlaunch.value.launcherprofiles.MinecraftProfile;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+/**
+ * RKB Mod Manager screen. All mod state changes go through the existing {@link ModManager}
+ * (files move between mods/ and mods/disabled/). Disk work runs on a single background thread and
+ * results are dropped if the screen was destroyed in the meantime.
+ */
 public class ModManagerFragment extends Fragment {
     public static final String TAG = "RKB_MOD_MANAGER";
 
-    private static final int BG     = 0xFF070B12;
-    private static final int CARD   = 0xFF0F1620;
-    private static final int ACCENT = 0xFF00B4FF;
-    private static final int GREEN  = 0xFF00E676;
-    private static final int RED    = 0xFFFF5252;
-    private static final int TEXT   = 0xFFE8EEF5;
-    private static final int MUTED  = 0xFF7A8BA0;
-    private static final int CHIP   = 0xFF1A2433;
+    private static final int FILTER_ALL = 0, FILTER_ON = 1, FILTER_OFF = 2;
+    private static final int SORT_AZ = 0, SORT_ZA = 1, SORT_ON_FIRST = 2;
+    private static final String[] SORT_LABELS = {"Name A-Z", "Name Z-A", "Enabled first"};
 
-    private LinearLayout mList;
-    private LinearLayout mTabs;
-    private TextView mSubtitle;
+    private final Handler mMain = new Handler(Looper.getMainLooper());
+    private ExecutorService mExecutor;
+    private int mGeneration; // bumped on every reload / destroy to invalidate stale results
+
+    private final List<ModInfo> mAll = new ArrayList<>();
+    private final List<ModInfo> mShown = new ArrayList<>();
     private String mSelectedKey;
+    private String mQuery = "";
+    private int mFilter = FILTER_ALL;
+    private int mSort = SORT_AZ;
+    private boolean mLoading;
+    private String mError;
+
+    private ModAdapter mAdapter;
+    private TextView mStateView;
+    private TextView mSortButton;
+    private LinearLayout mTabs;
+    private LinearLayout mFilterRow;
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull android.view.LayoutInflater inflater,
-                             @Nullable ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
+        mExecutor = Executors.newSingleThreadExecutor();
+        final android.content.Context c = requireContext();
 
-        ScrollView scroll = new ScrollView(requireContext());
-        scroll.setFillViewport(true);
-        scroll.setBackgroundColor(BG);
+        LinearLayout content = new LinearLayout(c);
+        content.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout root = new LinearLayout(requireContext());
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(12), dp(16), dp(28));
-        scroll.addView(root);
-
-        // Header row
-        LinearLayout header = row();
-        Button back = chip("← Back", CHIP, TEXT);
-        back.setOnClickListener(v -> requireActivity().onBackPressed());
-        header.addView(back);
-
-        TextView title = new TextView(requireContext());
-        title.setText("  RKB Mods");
-        title.setTextColor(ACCENT);
-        title.setTextSize(20);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(title);
-        root.addView(header);
-
-        space(root, 6);
-
-        mSubtitle = new TextView(requireContext());
-        mSubtitle.setTextColor(MUTED);
-        mSubtitle.setTextSize(12);
-        mSubtitle.setText("Per instance · enable / disable");
-        root.addView(mSubtitle);
-
-        space(root, 12);
-
-        // Instance tabs
-        HorizontalScrollView hsv = new HorizontalScrollView(requireContext());
-        hsv.setHorizontalScrollBarEnabled(false);
-        mTabs = row();
-        hsv.addView(mTabs);
-        root.addView(hsv);
-
-        space(root, 14);
-
-        mList = new LinearLayout(requireContext());
-        mList.setOrientation(LinearLayout.VERTICAL);
-        root.addView(mList);
-
-        space(root, 16);
-
-        LinearLayout actions = row();
-        Button refresh = chip("Refresh", CHIP, TEXT);
-        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(0, dp(42), 1f);
-        p1.setMarginEnd(dp(8));
-        refresh.setLayoutParams(p1);
-        refresh.setOnClickListener(v -> reload());
-        actions.addView(refresh);
-
-        Button open = chip("Open folder", ACCENT, Color.WHITE);
-        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(42), 1f);
-        open.setLayoutParams(p2);
-        open.setOnClickListener(v -> {
-            File mods = ModManager.getModsDir(getGameDir());
-            //noinspection ResultOfMethodCallIgnored
-            mods.mkdirs();
-            Tools.openPath(requireContext(), mods, false);
+        // search + sort
+        LinearLayout searchRow = new LinearLayout(c);
+        searchRow.setGravity(Gravity.CENTER_VERTICAL);
+        EditText search = new EditText(c);
+        search.setHint("Search mods...");
+        search.setHintTextColor(RkbUi.MUTED);
+        search.setTextColor(RkbUi.WHITE);
+        search.setTextSize(14);
+        search.setSingleLine(true);
+        search.setPadding(RkbUi.dp(c, 14), 0, RkbUi.dp(c, 14), 0);
+        search.setBackground(RkbUi.rounded(c, RkbUi.CARD, 12, RkbUi.BORDER, 1));
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int d) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int d) {}
+            @Override public void afterTextChanged(Editable s) {
+                mQuery = s.toString().trim().toLowerCase(Locale.ROOT);
+                applyFilter();
+            }
         });
-        actions.addView(open);
-        root.addView(actions);
+        searchRow.addView(search, new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f));
+
+        mSortButton = RkbUi.button(c, "Sort: " + SORT_LABELS[mSort], false, v -> {
+            mSort = (mSort + 1) % SORT_LABELS.length;
+            mSortButton.setText("Sort: " + SORT_LABELS[mSort]);
+            applyFilter();
+        });
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, RkbUi.dp(c, 42));
+        slp.leftMargin = RkbUi.dp(c, 8);
+        searchRow.addView(mSortButton, slp);
+        content.addView(searchRow);
+
+        // filter chips
+        mFilterRow = new LinearLayout(c);
+        mFilterRow.setPadding(0, RkbUi.dp(c, 8), 0, RkbUi.dp(c, 4));
+        content.addView(mFilterRow);
+        buildFilterChips();
+
+        // instance tabs (existing per-instance behaviour)
+        HorizontalScrollView hsv = new HorizontalScrollView(c);
+        hsv.setHorizontalScrollBarEnabled(false);
+        mTabs = new LinearLayout(c);
+        hsv.addView(mTabs);
+        content.addView(hsv);
+
+        // list + state text
+        android.widget.FrameLayout listFrame = new android.widget.FrameLayout(c);
+        RecyclerView rv = new RecyclerView(c);
+        rv.setLayoutManager(new LinearLayoutManager(c));
+        rv.setHasFixedSize(false);
+        rv.setClipToPadding(false);
+        rv.setPadding(0, RkbUi.dp(c, 8), 0, RkbUi.dp(c, 8));
+        mAdapter = new ModAdapter();
+        rv.setAdapter(mAdapter);
+        listFrame.addView(rv, RkbUi.match());
+
+        mStateView = RkbUi.text(c, "", 14, RkbUi.MUTED, false);
+        mStateView.setGravity(Gravity.CENTER);
+        listFrame.addView(mStateView, RkbUi.match());
+        content.addView(listFrame, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        // actions
+        LinearLayout actions = new LinearLayout(c);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.addView(actionButton(c, "Refresh", false, v -> reload()));
+        actions.addView(actionButton(c, "Enable all", false, v -> bulk(true)));
+        actions.addView(actionButton(c, "Disable all", false, v -> bulk(false)));
+        actions.addView(actionButton(c, "Open folder", true, v -> openFolder()));
+        content.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, RkbUi.dp(c, 44)));
 
         buildTabs();
         reload();
-        return scroll;
+        return RkbUi.scaffold(c, RkbNav.Dest.MODS, "Mod Manager",
+                "Manage your mods and enhance your gameplay.", content);
+    }
+
+    @Override
+    public void onDestroyView() {
+        mGeneration++;
+        mMain.removeCallbacksAndMessages(null);
+        if (mExecutor != null) mExecutor.shutdownNow();
+        mExecutor = null;
+        mAdapter = null;
+        super.onDestroyView();
+    }
+
+    private View actionButton(android.content.Context c, String label, boolean filled, View.OnClickListener l) {
+        TextView b = RkbUi.button(c, label, filled, l);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        lp.rightMargin = RkbUi.dp(c, 6);
+        b.setLayoutParams(lp);
+        b.setTextSize(12);
+        b.setPadding(RkbUi.dp(c, 6), 0, RkbUi.dp(c, 6), 0);
+        return b;
+    }
+
+    // ---------------------------------------------------------------- filters / tabs
+
+    private void buildFilterChips() {
+        final android.content.Context c = requireContext();
+        mFilterRow.removeAllViews();
+        String[] names = {"All", "Enabled", "Disabled"};
+        for (int i = 0; i < names.length; i++) {
+            final int f = i;
+            TextView chip = RkbUi.button(c, names[i], mFilter == i, v -> {
+                mFilter = f;
+                buildFilterChips();
+                applyFilter();
+            });
+            chip.setMinHeight(RkbUi.dp(c, 32));
+            chip.setTextSize(12);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, RkbUi.dp(c, 32));
+            lp.rightMargin = RkbUi.dp(c, 8);
+            mFilterRow.addView(chip, lp);
+        }
     }
 
     private void buildTabs() {
         mTabs.removeAllViews();
+        final android.content.Context c = requireContext();
         try {
             LauncherProfiles.load();
             Map<String, MinecraftProfile> map = LauncherProfiles.mainProfileJson.profiles;
             mSelectedKey = LauncherPreferences.DEFAULT_PREF.getString(
                     LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
-
-            if (map == null || map.isEmpty()) {
-                addTab("Default", null, true);
-                return;
+            if (map == null || map.size() < 2) return; // a single instance needs no tab bar
+            if (mSelectedKey == null || !map.containsKey(mSelectedKey)) {
+                mSelectedKey = map.keySet().iterator().next();
             }
-
-            boolean any = false;
             for (Map.Entry<String, MinecraftProfile> e : map.entrySet()) {
-                String key = e.getKey();
-                String name = e.getValue().name;
-                if (!Tools.isValidString(name)) name = key;
-                boolean selected = key.equals(mSelectedKey);
-                if (selected) any = true;
-                addTab(name, key, selected);
-            }
-            if (!any && map.size() > 0) {
-                // first as selected
-                String first = map.keySet().iterator().next();
-                mSelectedKey = first;
-                buildTabs();
+                final String key = e.getKey();
+                String name = Tools.isValidString(e.getValue().name) ? e.getValue().name : key;
+                TextView tab = RkbUi.button(c, name, key.equals(mSelectedKey), v -> {
+                    mSelectedKey = key;
+                    LauncherPreferences.DEFAULT_PREF.edit()
+                            .putString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, key).apply();
+                    buildTabs();
+                    reload();
+                });
+                tab.setMinHeight(RkbUi.dp(c, 32));
+                tab.setTextSize(12);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, RkbUi.dp(c, 32));
+                lp.rightMargin = RkbUi.dp(c, 8);
+                lp.topMargin = RkbUi.dp(c, 4);
+                mTabs.addView(tab, lp);
             }
         } catch (Exception ex) {
-            addTab("Default", null, true);
+            android.util.Log.w("RKB-ModManager", "Could not build instance tabs", ex);
         }
     }
 
-    private void addTab(String label, String key, boolean selected) {
-        Button b = chip(label, selected ? ACCENT : CHIP, selected ? Color.WHITE : TEXT);
-        b.setOnClickListener(v -> {
-            mSelectedKey = key;
-            if (key != null) {
-                LauncherPreferences.DEFAULT_PREF.edit()
-                        .putString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, key)
-                        .apply();
-            }
-            buildTabs();
-            reload();
-        });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
-        lp.setMarginEnd(dp(8));
-        b.setLayoutParams(lp);
-        mTabs.addView(b);
-    }
-
-    private void reload() {
-        mList.removeAllViews();
-        File gameDir = getGameDir();
-        List<ModInfo> mods = ModManager.listMods(gameDir);
-
-        int on = 0;
-        for (ModInfo m : mods) if (m.enabled) on++;
-
-        mSubtitle.setText(mods.size() + " mods  ·  " + on + " enabled  ·  "
-                + (mods.size() - on) + " disabled");
-
-        if (mods.isEmpty()) {
-            TextView empty = new TextView(requireContext());
-            empty.setTextColor(MUTED);
-            empty.setTextSize(14);
-            empty.setPadding(0, dp(32), 0, 0);
-            empty.setText("No mods in this instance.\nPut .jar files in the mods folder.");
-            mList.addView(empty);
-            return;
-        }
-
-        for (ModInfo mod : mods) {
-            mList.addView(modCard(gameDir, mod));
-            space(mList, 10);
-        }
-    }
-
-    private View modCard(File gameDir, ModInfo mod) {
-        LinearLayout card = new LinearLayout(requireContext());
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14), dp(12), dp(12), dp(12));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(CARD);
-        bg.setCornerRadius(dp(14));
-        bg.setStroke(dp(1), 0xFF1C2838);
-        card.setBackground(bg);
-
-        // Icon circle
-        TextView icon = new TextView(requireContext());
-        icon.setText("MOD");
-        icon.setTextSize(10);
-        icon.setTypeface(Typeface.DEFAULT_BOLD);
-        icon.setTextColor(ACCENT);
-        icon.setTextSize(18);
-        icon.setGravity(Gravity.CENTER);
-        GradientDrawable iconBg = new GradientDrawable();
-        iconBg.setColor(0xFF152030);
-        iconBg.setCornerRadius(dp(10));
-        icon.setBackground(iconBg);
-        icon.setPadding(dp(8), dp(8), dp(8), dp(8));
-        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(40), dp(40));
-        iconLp.setMarginEnd(dp(12));
-        icon.setLayoutParams(iconLp);
-        card.addView(icon);
-
-        // Name + status
-        LinearLayout info = new LinearLayout(requireContext());
-        info.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        info.setLayoutParams(infoLp);
-
-        TextView name = new TextView(requireContext());
-        name.setText(mod.displayName);
-        name.setTextColor(TEXT);
-        name.setTextSize(14);
-        name.setTypeface(Typeface.DEFAULT_BOLD);
-        name.setMaxLines(1);
-        info.addView(name);
-
-        TextView sub = new TextView(requireContext());
-        sub.setText(mod.enabled ? "Enabled" : "Disabled");
-        sub.setTextColor(mod.enabled ? GREEN : RED);
-        sub.setTextSize(12);
-        info.addView(sub);
-        card.addView(info);
-
-        // Switch-style toggle
-        Button toggle = switchBtn(mod.enabled);
-        final ModInfo ref = mod;
-        toggle.setOnClickListener(v -> {
-            boolean ok = ref.enabled
-                    ? ModManager.disableMod(gameDir, ref)
-                    : ModManager.enableMod(gameDir, ref);
-            Toast.makeText(requireContext(),
-                    ok ? ((ref.enabled ? "OFF" : "ON") + " · " + ref.displayName) : "Failed",
-                    Toast.LENGTH_SHORT).show();
-            reload();
-        });
-        card.addView(toggle);
-        return card;
-    }
-
-    private Button switchBtn(boolean on) {
-        Button b = new Button(requireContext());
-        b.setText(on ? "ON" : "OFF");
-        b.setTextColor(on ? Color.WHITE : MUTED);
-        b.setTextSize(11);
-        b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setAllCaps(true);
-        b.setMinWidth(dp(56));
-        b.setPadding(dp(14), dp(6), dp(14), dp(6));
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(on ? ACCENT : 0xFF1A2230);
-        g.setCornerRadius(dp(20));
-        if (on) g.setStroke(0, 0);
-        else g.setStroke(dp(1), 0xFF2A3545);
-        b.setBackground(g);
-        return b;
-    }
+    // ---------------------------------------------------------------- loading (background)
 
     private File getGameDir() {
         try {
-            if (Tools.isValidString(mSelectedKey)) {
-                LauncherProfiles.load();
-                MinecraftProfile p = LauncherProfiles.mainProfileJson.profiles.get(mSelectedKey);
-                if (p != null) return Tools.getGameDirPath(p);
-            }
-            String key = LauncherPreferences.DEFAULT_PREF.getString(
-                    LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
+            String key = Tools.isValidString(mSelectedKey) ? mSelectedKey
+                    : LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
             if (Tools.isValidString(key)) {
                 LauncherProfiles.load();
                 MinecraftProfile p = LauncherProfiles.mainProfileJson.profiles.get(key);
                 if (p != null) return Tools.getGameDirPath(p);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) { }
         return new File(Tools.DIR_GAME_NEW);
     }
 
-    private LinearLayout row() {
-        LinearLayout l = new LinearLayout(requireContext());
-        l.setOrientation(LinearLayout.HORIZONTAL);
-        l.setGravity(Gravity.CENTER_VERTICAL);
-        return l;
+    private void reload() {
+        if (mExecutor == null) return;
+        final int gen = ++mGeneration;
+        final File gameDir = getGameDir(); // tiny json read; the heavy scan happens below
+        mLoading = true;
+        mError = null;
+        updateState();
+        try {
+            mExecutor.execute(() -> {
+                List<ModInfo> mods = null;
+                String err = null;
+                try {
+                    mods = ModManager.listMods(gameDir);
+                    for (ModInfo m : mods) {
+                        if (gen != mGeneration) return; // cancelled
+                        ModManager.readMeta(m);
+                    }
+                } catch (Throwable t) {
+                    err = String.valueOf(t.getMessage());
+                }
+                final List<ModInfo> result = mods;
+                final String error = err;
+                mMain.post(() -> {
+                    if (gen != mGeneration || !isAdded() || mAdapter == null) return;
+                    mLoading = false;
+                    mError = error;
+                    mAll.clear();
+                    if (result != null) mAll.addAll(result);
+                    applyFilter();
+                });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) { }
     }
 
-    private Button chip(String text, int bgColor, int textColor) {
-        Button b = new Button(requireContext());
-        b.setText(text);
-        b.setTextColor(textColor);
-        b.setTextSize(13);
-        b.setAllCaps(false);
-        b.setPadding(dp(14), dp(6), dp(14), dp(6));
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(bgColor);
-        g.setCornerRadius(dp(20));
-        b.setBackground(g);
-        return b;
+    private void applyFilter() {
+        if (mAdapter == null) return;
+        mShown.clear();
+        for (ModInfo m : mAll) {
+            if (mFilter == FILTER_ON && !m.enabled) continue;
+            if (mFilter == FILTER_OFF && m.enabled) continue;
+            if (!mQuery.isEmpty()) {
+                String hay = (title(m) + " " + m.fileName + " " + (m.description == null ? "" : m.description))
+                        .toLowerCase(Locale.ROOT);
+                if (!hay.contains(mQuery)) continue;
+            }
+            mShown.add(m);
+        }
+        Collections.sort(mShown, (a, b) -> {
+            if (mSort == SORT_ON_FIRST && a.enabled != b.enabled) return a.enabled ? -1 : 1;
+            int cmp = title(a).toLowerCase(Locale.ROOT).compareTo(title(b).toLowerCase(Locale.ROOT));
+            return mSort == SORT_ZA ? -cmp : cmp;
+        });
+        mAdapter.notifyDataSetChanged();
+        updateState();
     }
 
-    private void space(LinearLayout parent, int d) {
-        View v = new View(requireContext());
-        v.setLayoutParams(new LinearLayout.LayoutParams(1, dp(d)));
-        parent.addView(v);
+    private void updateState() {
+        if (mStateView == null) return;
+        String msg = null;
+        if (mLoading) msg = "Loading mods...";
+        else if (mError != null) msg = "Could not read the mods folder:\n" + mError + "\n\nTap Refresh to retry.";
+        else if (mAll.isEmpty()) msg = "No mods in this instance.\nPut .jar files in the mods folder.";
+        else if (mShown.isEmpty()) msg = "No mods match your search or filter.";
+        mStateView.setText(msg == null ? "" : msg);
+        mStateView.setVisibility(msg == null ? View.GONE : View.VISIBLE);
     }
 
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
+    // ---------------------------------------------------------------- actions (background file moves)
+
+    private static String title(ModInfo m) {
+        return m.metaName != null ? m.metaName : m.displayName;
     }
+
+    private void toggle(ModInfo mod) {
+        if (mExecutor == null) return;
+        final File gameDir = getGameDir();
+        final boolean wasEnabled = mod.enabled;
+        try {
+            mExecutor.execute(() -> {
+                final boolean ok = ModManager.toggleMod(gameDir, mod);
+                mMain.post(() -> {
+                    if (!isAdded() || mAdapter == null) return;
+                    if (!ok) Toast.makeText(requireContext(), "Could not change " + title(mod), Toast.LENGTH_SHORT).show();
+                    else Toast.makeText(requireContext(), (wasEnabled ? "Disabled " : "Enabled ") + title(mod), Toast.LENGTH_SHORT).show();
+                    applyFilter();
+                });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) { }
     }
+
+    private void bulk(boolean enable) {
+        if (mExecutor == null || mAll.isEmpty()) return;
+        final File gameDir = getGameDir();
+        new AlertDialog.Builder(requireContext())
+                .setTitle(enable ? "Enable all mods?" : "Disable all mods?")
+                .setMessage("This moves every mod file in this instance " + (enable ? "into" : "out of") + " the active mods folder. Nothing is deleted.")
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    try {
+                        mExecutor.execute(() -> {
+                            if (enable) ModManager.enableAll(gameDir); else ModManager.disableAll(gameDir);
+                            mMain.post(() -> { if (isAdded()) reload(); });
+                        });
+                    } catch (java.util.concurrent.RejectedExecutionException ignored) { }
+                }).show();
+    }
+
+    private void openFolder() {
+        try {
+            File mods = ModManager.getModsDir(getGameDir());
+            //noinspection ResultOfMethodCallIgnored
+            mods.mkdirs();
+            Tools.openPath(requireContext(), mods, false);
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Could not open the mods folder", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showDetails(ModInfo m) {
+        String msg = "File: " + m.fileName
+                + "\nStatus: " + (m.enabled ? "Enabled" : "Disabled")
+                + (m.version != null ? "\nVersion: " + m.version : "")
+                + "\nSize: " + android.text.format.Formatter.formatShortFileSize(requireContext(), m.sizeBytes)
+                + (m.description != null ? "\n\n" + m.description : "")
+                + "\n\n" + m.absolutePath;
+        new AlertDialog.Builder(requireContext()).setTitle(title(m)).setMessage(msg)
+                .setPositiveButton(android.R.string.ok, null).show();
+    }
+
+    private void confirmDelete(ModInfo m) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Delete " + title(m) + "?")
+                .setMessage("The jar file will be permanently deleted from this instance.")
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("Delete", (d, w) -> {
+                    if (mExecutor == null) return;
+                    try {
+                        mExecutor.execute(() -> {
+                            final boolean ok = ModManager.deleteMod(m);
+                            mMain.post(() -> {
+                                if (!isAdded()) return;
+                                Toast.makeText(requireContext(), ok ? "Deleted" : "Delete failed", Toast.LENGTH_SHORT).show();
+                                reload();
+                            });
+                        });
+                    } catch (java.util.concurrent.RejectedExecutionException ignored) { }
+                }).show();
+    }
+
+    // ---------------------------------------------------------------- adapter
+
+    private final class ModAdapter extends RecyclerView.Adapter<ModAdapter.Holder> {
+        final class Holder extends RecyclerView.ViewHolder {
+            final TextView icon, name, meta, desc, toggle, more;
+            Holder(View v, TextView icon, TextView name, TextView meta, TextView desc, TextView toggle, TextView more) {
+                super(v);
+                this.icon = icon; this.name = name; this.meta = meta; this.desc = desc;
+                this.toggle = toggle; this.more = more;
+            }
+        }
+
+        @NonNull
+        @Override
+        public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            android.content.Context c = parent.getContext();
+            LinearLayout card = new LinearLayout(c);
+            card.setGravity(Gravity.CENTER_VERTICAL);
+            card.setPadding(RkbUi.dp(c, 12), RkbUi.dp(c, 10), RkbUi.dp(c, 8), RkbUi.dp(c, 10));
+            card.setBackground(RkbUi.rounded(c, RkbUi.CARD, 14, RkbUi.BORDER, 1));
+            RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = RkbUi.dp(c, 8);
+            card.setLayoutParams(lp);
+
+            TextView icon = RkbUi.text(c, "", 16, RkbUi.BLUE, true);
+            icon.setGravity(Gravity.CENTER);
+            icon.setBackground(RkbUi.rounded(c, RkbUi.CARD_2, 10, RkbUi.BORDER, 1));
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(RkbUi.dp(c, 40), RkbUi.dp(c, 40));
+            ilp.rightMargin = RkbUi.dp(c, 12);
+            card.addView(icon, ilp);
+
+            LinearLayout info = new LinearLayout(c);
+            info.setOrientation(LinearLayout.VERTICAL);
+            TextView name = RkbUi.text(c, "", 14, RkbUi.WHITE, true);
+            name.setSingleLine(true);
+            name.setEllipsize(TextUtils.TruncateAt.END);
+            TextView meta = RkbUi.text(c, "", 11, RkbUi.BLUE, false);
+            meta.setSingleLine(true);
+            TextView desc = RkbUi.text(c, "", 12, RkbUi.MUTED, false);
+            desc.setMaxLines(1);
+            desc.setEllipsize(TextUtils.TruncateAt.END);
+            info.addView(name); info.addView(meta); info.addView(desc);
+            card.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            TextView toggle = RkbUi.text(c, "", 11, RkbUi.WHITE, true);
+            toggle.setGravity(Gravity.CENTER);
+            toggle.setClickable(true);
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(RkbUi.dp(c, 58), RkbUi.dp(c, 30));
+            tlp.leftMargin = RkbUi.dp(c, 8);
+            card.addView(toggle, tlp);
+
+            TextView more = RkbUi.text(c, "\u22EE", 22, RkbUi.WHITE, false);
+            more.setGravity(Gravity.CENTER);
+            more.setClickable(true);
+            card.addView(more, new LinearLayout.LayoutParams(RkbUi.dp(c, 36), RkbUi.dp(c, 40)));
+            return new Holder(card, icon, name, meta, desc, toggle, more);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull Holder h, int position) {
+            final ModInfo m = mShown.get(position);
+            android.content.Context c = h.itemView.getContext();
+            String t = title(m);
+            h.icon.setText(t.isEmpty() ? "?" : t.substring(0, 1).toUpperCase(Locale.ROOT));
+            h.name.setText(t);
+            h.meta.setText((m.version != null ? "v" + m.version + "  \u2022  " : "") + (m.enabled ? "Enabled" : "Disabled"));
+            h.meta.setTextColor(m.enabled ? RkbUi.GREEN : RkbUi.MUTED);
+            h.desc.setText(m.description != null ? m.description : m.fileName);
+            h.toggle.setText(m.enabled ? "ON" : "OFF");
+            h.toggle.setTextColor(m.enabled ? RkbUi.WHITE : RkbUi.MUTED);
+            h.toggle.setBackground(RkbUi.ripple(c, m.enabled
+                    ? RkbUi.rounded(c, RkbUi.BLUE, 15, 0, 0)
+                    : RkbUi.rounded(c, RkbUi.CARD_2, 15, RkbUi.BORDER, 1)));
+            h.toggle.setOnClickListener(v -> toggle(m));
+            h.itemView.setOnClickListener(v -> showDetails(m));
+            h.more.setOnClickListener(v -> {
+                PopupMenu pm = new PopupMenu(v.getContext(), v);
+                pm.getMenu().add(0, 1, 0, "Details");
+                pm.getMenu().add(0, 2, 1, m.enabled ? "Disable" : "Enable");
+                pm.getMenu().add(0, 3, 2, "Delete");
+                pm.setOnMenuItemClickListener(item -> {
+                    if (item.getItemId() == 1) showDetails(m);
+                    else if (item.getItemId() == 2) toggle(m);
+                    else confirmDelete(m);
+                    return true;
+                });
+                pm.show();
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return mShown.size();
+        }
+    }
+}

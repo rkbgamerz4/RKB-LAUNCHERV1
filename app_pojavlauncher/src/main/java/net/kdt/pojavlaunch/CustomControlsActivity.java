@@ -29,9 +29,6 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		getWindow().setStatusBarColor(android.graphics.Color.rgb(5, 8, 15));
-		getWindow().setNavigationBarColor(android.graphics.Color.rgb(5, 8, 15));
-		getWindow().getDecorView().setSystemUiVisibility(0);
 		setContentView(R.layout.activity_custom_controls);
 
 		mControlLayout = findViewById(R.id.customctrl_controllayout);

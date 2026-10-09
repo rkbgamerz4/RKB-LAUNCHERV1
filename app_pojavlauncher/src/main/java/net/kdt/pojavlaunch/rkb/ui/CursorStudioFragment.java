@@ -1,16 +1,17 @@
 package net.kdt.pojavlaunch.rkb.ui;
 
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.widget.GridLayout;
 import android.widget.LinearLayout;
-import android.widget.SeekBar;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -21,244 +22,253 @@ import androidx.fragment.app.Fragment;
 import net.kdt.pojavlaunch.rkb.cursor.CursorStudioPrefs;
 
 /**
- * RKB Cursor Studio — style, color, size, opacity for the virtual mouse cursor.
- * Wire into main navigation (same place as HTML side-nav 🖱️).
+ * RKB Cursor Studio. Edits are staged in this screen and written on Save. The saved values are
+ * read by the in-game virtual mouse (customcontrols.mouse.Touchpad) the next time a game starts.
  */
 public class CursorStudioFragment extends Fragment {
     public static final String TAG = "RKB_CURSOR_STUDIO";
 
-    private View previewRing;
-    private TextView sizeLabel;
-    private TextView opacityLabel;
+    private static final String[][] PRESETS = {
+            {CursorStudioPrefs.STYLE_CLASSIC, "Classic Arrow"},
+            {CursorStudioPrefs.STYLE_NEON, "Neon Arrow"},
+            {CursorStudioPrefs.STYLE_CROSSHAIR, "Crosshair"},
+            {CursorStudioPrefs.STYLE_DOT, "Dot"},
+            {CursorStudioPrefs.STYLE_RING, "Ring"},
+    };
+    private static final String[] COLORS = {
+            "#00A8FF", "#FF3B3B", "#2ECC71", "#A855F7", "#FFD60A", "#FFFFFF", "#FF8A00"};
+
+    private String mStyle;
+    private String mColor;
+    private int mSize;
+    private int mOpacity;
+
+    private PreviewView mPreview;
+    private TextView mSizeLabel, mOpacityLabel;
+    private SeekBar mSizeBar, mOpacityBar;
+    private LinearLayout mPresetHolder, mColorHolder;
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        ScrollView scroll = new ScrollView(requireContext());
-        scroll.setFillViewport(true);
-        scroll.setClipToPadding(false);
-        scroll.setBackgroundColor(0xFF05080F);
+        final Context c = requireContext();
+        mStyle = CursorStudioPrefs.getStyle();
+        mColor = CursorStudioPrefs.getColorHex();
+        mSize = CursorStudioPrefs.getSizePercent();
+        mOpacity = CursorStudioPrefs.getOpacityPercent();
 
-        LinearLayout root = new LinearLayout(requireContext());
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(18), dp(20), dp(24));
-        root.setBackgroundColor(0xFF05080F);
-        scroll.addView(root, new ScrollView.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        boolean wide = !RkbUi.isCompact(c);
+        LinearLayout body = new LinearLayout(c);
+        body.setOrientation(wide ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
 
-        TextView title = new TextView(requireContext());
-        title.setText("RKB Cursor Studio");
-        title.setTextColor(0xFFEEF6FF);
-        title.setTextSize(20);
-        title.setPadding(0, 0, 0, 8);
-        root.addView(title);
+        // ---- left: presets
+        LinearLayout left = new LinearLayout(c);
+        left.setOrientation(LinearLayout.VERTICAL);
+        left.addView(RkbUi.text(c, "Presets", 13, RkbUi.MUTED, true));
+        mPresetHolder = new LinearLayout(c);
+        mPresetHolder.setOrientation(LinearLayout.VERTICAL);
+        left.addView(mPresetHolder);
+        buildPresets();
 
-        TextView sub = new TextView(requireContext());
-        sub.setText("Style · color · size · opacity");
-        sub.setTextColor(0xFF7A8FA8);
-        sub.setTextSize(12);
-        sub.setPadding(0, 0, 0, 20);
-        root.addView(sub);
+        // ---- right: preview + controls
+        LinearLayout right = RkbUi.card(c);
+        right.addView(RkbUi.text(c, "Preview", 13, RkbUi.MUTED, true));
+        mPreview = new PreviewView(c);
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, RkbUi.dp(c, 110));
+        plp.topMargin = RkbUi.dp(c, 6);
+        right.addView(mPreview, plp);
+        mPreview.setBackground(RkbUi.rounded(c, 0xFF0A1220, 12, RkbUi.BORDER, 1));
 
-        // Preview
-        LinearLayout previewBox = new LinearLayout(requireContext());
-        previewBox.setGravity(Gravity.CENTER);
-        previewBox.setPadding(0, 24, 0, 24);
-        GradientDrawable previewBg = new GradientDrawable();
-        previewBg.setColor(0xFF0A1520);
-        previewBg.setCornerRadius(24);
-        previewBg.setStroke(2, 0x3300B4FF);
-        previewBox.setBackground(previewBg);
-        previewBox.setMinimumHeight(180);
+        mSizeLabel = RkbUi.text(c, "", 12, RkbUi.WHITE, true);
+        right.addView(mSizeLabel);
+        mSizeBar = seek(c, 50, 150, mSize, p -> { mSize = p; refreshLabels(); mPreview.invalidate(); });
+        right.addView(mSizeBar);
 
-        previewRing = new View(requireContext());
-        LinearLayout.LayoutParams ringLp = new LinearLayout.LayoutParams(dp(72), dp(72));
-        previewRing.setLayoutParams(ringLp);
-        updatePreview();
-        previewBox.addView(previewRing);
-        root.addView(previewBox, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        mOpacityLabel = RkbUi.text(c, "", 12, RkbUi.WHITE, true);
+        right.addView(mOpacityLabel);
+        mOpacityBar = seek(c, 20, 100, mOpacity, p -> { mOpacity = p; refreshLabels(); mPreview.invalidate(); });
+        right.addView(mOpacityBar);
 
-        // Styles
-        root.addView(sectionLabel("QUICK STYLE"));
-        LinearLayout styles = row();
-        styles.addView(styleBtn("Classic", CursorStudioPrefs.STYLE_CLASSIC));
-        styles.addView(styleBtn("Pulse", CursorStudioPrefs.STYLE_PULSE));
-        styles.addView(styleBtn("Gamepad", CursorStudioPrefs.STYLE_GAMEPAD));
-        styles.addView(styleBtn("Custom", CursorStudioPrefs.STYLE_CUSTOM));
-        root.addView(styles);
+        right.addView(RkbUi.text(c, "Color", 12, RkbUi.WHITE, true));
+        mColorHolder = new LinearLayout(c);
+        mColorHolder.setPadding(0, RkbUi.dp(c, 6), 0, RkbUi.dp(c, 8));
+        right.addView(mColorHolder);
+        buildColors();
 
-        // Colors
-        root.addView(sectionLabel("COLOR"));
-        LinearLayout colors = row();
-        int[] palette = {0xFF00B4FF, 0xFF3DD6FF, 0xFFFFFFFF, 0xFF22D3EE, 0xFF4ADE80, 0xFFF472B6};
-        for (int c : palette) {
-            colors.addView(colorDot(c));
-        }
-        root.addView(colors);
+        LinearLayout buttons = new LinearLayout(c);
+        TextView reset = RkbUi.button(c, "Reset", false, v -> doReset());
+        TextView save = RkbUi.button(c, "Save", true, v -> doSave());
+        LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f);
+        b1.rightMargin = RkbUi.dp(c, 8);
+        buttons.addView(reset, b1);
+        buttons.addView(save, new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f));
+        right.addView(buttons);
 
-        // Size
-        root.addView(sectionLabel("SIZE"));
-        sizeLabel = new TextView(requireContext());
-        sizeLabel.setTextColor(0xFF7A8FA8);
-        sizeLabel.setTextSize(11);
-        root.addView(sizeLabel);
-        SeekBar sizeBar = new SeekBar(requireContext());
-        sizeBar.setMax(100); // 50..150 → map 0..100
-        sizeBar.setProgress(CursorStudioPrefs.getSizePercent() - 50);
-        sizeBar.setOnSeekBarChangeListener(simpleSeek(progress -> {
-            CursorStudioPrefs.setSizePercent(progress + 50);
-            refreshLabels();
-            updatePreview();
-        }));
-        root.addView(sizeBar);
-
-        // Opacity
-        root.addView(sectionLabel("OPACITY"));
-        opacityLabel = new TextView(requireContext());
-        opacityLabel.setTextColor(0xFF7A8FA8);
-        opacityLabel.setTextSize(11);
-        root.addView(opacityLabel);
-        SeekBar opBar = new SeekBar(requireContext());
-        opBar.setMax(80); // 20..100
-        opBar.setProgress(CursorStudioPrefs.getOpacityPercent() - 20);
-        opBar.setOnSeekBarChangeListener(simpleSeek(progress -> {
-            CursorStudioPrefs.setOpacityPercent(progress + 20);
-            refreshLabels();
-            updatePreview();
-        }));
-        root.addView(opBar);
-
-        // Save
-        Button save = new Button(requireContext());
-        save.setText("SAVE & APPLY");
-        save.setAllCaps(false);
-        save.setTextSize(14);
-        save.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        save.setTextColor(0xFF021018);
-        GradientDrawable saveBg = new GradientDrawable();
-        saveBg.setColor(0xFF00A8FF);
-        saveBg.setCornerRadius(dp(12));
-        save.setBackground(saveBg);
-        save.setOnClickListener(v -> {
-            Toast.makeText(requireContext(),
-                    "Cursor saved: " + CursorStudioPrefs.getStyle()
-                            + " · " + CursorStudioPrefs.getSizePercent() + "%"
-                            + " · " + CursorStudioPrefs.getOpacityPercent() + "%",
-                    Toast.LENGTH_SHORT).show();
-        });
-        LinearLayout.LayoutParams saveLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        saveLp.topMargin = 28;
-        root.addView(save, saveLp);
+        TextView note = RkbUi.text(c, "Applies to the on-screen virtual mouse cursor the next time a game starts. "
+                + "Cursor drawn by Minecraft itself (menus with a grabbed mouse, crosshair) is not changed.",
+                11, RkbUi.MUTED, false);
+        note.setPadding(0, RkbUi.dp(c, 8), 0, 0);
+        right.addView(note);
 
         refreshLabels();
-        return scroll;
+
+        if (wide) {
+            body.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            rlp.leftMargin = RkbUi.dp(c, 12);
+            body.addView(right, rlp);
+        } else {
+            body.addView(left);
+            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rlp.topMargin = RkbUi.dp(c, 12);
+            body.addView(right, rlp);
+        }
+
+        ScrollView sv = new ScrollView(c);
+        sv.setFillViewport(false);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.addView(body);
+        return RkbUi.scaffold(c, RkbNav.Dest.CURSOR, "Cursor Studio",
+                "Customize your cursor for a better experience.", sv);
+    }
+
+    // ---------------------------------------------------------------- building
+
+    private void buildPresets() {
+        final Context c = requireContext();
+        mPresetHolder.removeAllViews();
+        int perRow = RkbUi.isCompact(c) ? 2 : 3;
+        LinearLayout row = null;
+        for (int i = 0; i < PRESETS.length; i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(c);
+                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                rp.topMargin = RkbUi.dp(c, 8);
+                mPresetHolder.addView(row, rp);
+            }
+            final String style = PRESETS[i][0];
+            boolean sel = style.equals(mStyle);
+            LinearLayout tile = new LinearLayout(c);
+            tile.setOrientation(LinearLayout.VERTICAL);
+            tile.setGravity(Gravity.CENTER);
+            tile.setClickable(true);
+            tile.setBackground(RkbUi.ripple(c, RkbUi.rounded(c, sel ? 0xFF0B2236 : RkbUi.CARD, 12,
+                    sel ? RkbUi.BLUE : RkbUi.BORDER, sel ? 2 : 1)));
+            tile.setOnClickListener(v -> { mStyle = style; buildPresets(); mPreview.invalidate(); });
+            TileIcon icon = new TileIcon(c, style);
+            tile.addView(icon, new LinearLayout.LayoutParams(RkbUi.dp(c, 44), RkbUi.dp(c, 44)));
+            TextView name = RkbUi.text(c, PRESETS[i][1], 11, RkbUi.WHITE, sel);
+            name.setGravity(Gravity.CENTER);
+            name.setSingleLine(true);
+            tile.addView(name);
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 84), 1f);
+            tlp.rightMargin = RkbUi.dp(c, 8);
+            row.addView(tile, tlp);
+        }
+    }
+
+    private void buildColors() {
+        final Context c = requireContext();
+        mColorHolder.removeAllViews();
+        for (final String hex : COLORS) {
+            boolean sel = hex.equalsIgnoreCase(mColor);
+            View dot = new View(c);
+            dot.setBackground(RkbUi.rounded(c, CursorStudioPrefs.parseColor(hex), 14,
+                    sel ? RkbUi.WHITE : RkbUi.BORDER, sel ? 2 : 1));
+            dot.setClickable(true);
+            dot.setContentDescription("Color " + hex);
+            dot.setOnClickListener(v -> { mColor = hex; buildColors(); buildPresetsKeepScroll(); mPreview.invalidate(); });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(RkbUi.dp(c, 28), RkbUi.dp(c, 28));
+            lp.rightMargin = RkbUi.dp(c, 8);
+            mColorHolder.addView(dot, lp);
+        }
+    }
+
+    private void buildPresetsKeepScroll() { buildPresets(); }
+
+    private interface IntConsumer { void accept(int v); }
+
+    private SeekBar seek(Context c, final int min, int max, int value, final IntConsumer l) {
+        SeekBar s = new SeekBar(c);
+        s.setMax(max - min);
+        s.setProgress(value - min);
+        s.setPadding(RkbUi.dp(c, 4), RkbUi.dp(c, 6), RkbUi.dp(c, 4), RkbUi.dp(c, 6));
+        s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar sb, int p, boolean fromUser) { l.accept(p + min); }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return s;
     }
 
     private void refreshLabels() {
-        if (sizeLabel != null) {
-            sizeLabel.setText(CursorStudioPrefs.getSizePercent() + "%");
-        }
-        if (opacityLabel != null) {
-            opacityLabel.setText(CursorStudioPrefs.getOpacityPercent() + "%");
-        }
+        mSizeLabel.setText("Size: " + mSize + "%");
+        mOpacityLabel.setText("Opacity: " + mOpacity + "%");
     }
 
-    private void updatePreview() {
-        if (previewRing == null) return;
-        int color = CursorStudioPrefs.getColorArgb();
-        int alpha = Math.round(255 * CursorStudioPrefs.getOpacity());
-        int withAlpha = (color & 0x00FFFFFF) | (alpha << 24);
-        float scale = CursorStudioPrefs.getSizeMultiplier();
-        int size = Math.round(dp(72) * scale);
-        ViewGroup.LayoutParams lp = previewRing.getLayoutParams();
-        if (lp != null) {
-            lp.width = size;
-            lp.height = size;
-            previewRing.setLayoutParams(lp);
-        }
-        GradientDrawable ring = new GradientDrawable();
-        ring.setShape(GradientDrawable.OVAL);
-        ring.setStroke(dp(3), withAlpha);
-        ring.setColor(Color.TRANSPARENT);
-        previewRing.setBackground(ring);
+    // ---------------------------------------------------------------- actions
+
+    private void doSave() {
+        CursorStudioPrefs.save(mStyle, mColor, mSize, mOpacity);
+        Toast.makeText(requireContext(), "Cursor saved. It applies when the next game starts.", Toast.LENGTH_SHORT).show();
     }
 
-    private TextView sectionLabel(String t) {
-        TextView tv = new TextView(requireContext());
-        tv.setText(t);
-        tv.setTextColor(0xFF7A8FA8);
-        tv.setTextSize(11);
-        tv.setPadding(0, dp(18), 0, dp(8));
-        return tv;
+    private void doReset() {
+        CursorStudioPrefs.resetToDefaults();
+        mStyle = CursorStudioPrefs.getStyle();
+        mColor = CursorStudioPrefs.getColorHex();
+        mSize = CursorStudioPrefs.getSizePercent();
+        mOpacity = CursorStudioPrefs.getOpacityPercent();
+        mSizeBar.setProgress(mSize - 50);
+        mOpacityBar.setProgress(mOpacity - 20);
+        buildPresets();
+        buildColors();
+        refreshLabels();
+        mPreview.invalidate();
+        Toast.makeText(requireContext(), "Cursor reset to default", Toast.LENGTH_SHORT).show();
     }
 
-    private LinearLayout row() {
-        LinearLayout row = new LinearLayout(requireContext());
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, 0, 0, 4);
-        return row;
-    }
+    // ---------------------------------------------------------------- views
 
-    private Button styleBtn(String label, String style) {
-        Button b = new Button(requireContext());
-        b.setText(label);
-        b.setTextSize(11);
-        b.setPadding(dp(4), 0, dp(4), 0);
-        b.setAllCaps(false);
-        boolean on = style.equals(CursorStudioPrefs.getStyle());
-        b.setTextColor(on ? 0xFF021018 : 0xFFEEF6FF);
-        b.setBackgroundColor(on ? 0xFF00B4FF : 0xFF141C2A);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        lp.setMargins(4, 0, 4, 0);
-        b.setLayoutParams(lp);
-        b.setOnClickListener(v -> {
-            CursorStudioPrefs.setStyle(style);
-            // rebuild parent styles row highlight is light — toast is enough
-            Toast.makeText(requireContext(), "Style: " + label, Toast.LENGTH_SHORT).show();
-            updatePreview();
-        });
-        return b;
-    }
+    /** Draws the staged cursor using the same factory as the in-game touchpad. */
+    private final class PreviewView extends View {
+        PreviewView(Context c) { super(c); }
 
-    private View colorDot(int color) {
-        View v = new View(requireContext());
-        int s = dp(28);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(s, s);
-        lp.setMargins(6, 4, 6, 4);
-        v.setLayoutParams(lp);
-        GradientDrawable d = new GradientDrawable();
-        d.setShape(GradientDrawable.OVAL);
-        d.setColor(color);
-        if (color == CursorStudioPrefs.getColorArgb()) {
-            d.setStroke(dp(2), 0xFFFFFFFF);
-        }
-        v.setBackground(d);
-        v.setOnClickListener(x -> {
-            String hex = String.format("#%06X", color & 0xFFFFFF);
-            CursorStudioPrefs.setColorHex(hex);
-            updatePreview();
-            Toast.makeText(requireContext(), "Color " + hex, Toast.LENGTH_SHORT).show();
-        });
-        return v;
-    }
-
-    private interface ProgressCb { void on(int progress); }
-
-    private SeekBar.OnSeekBarChangeListener simpleSeek(ProgressCb cb) {
-        return new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) cb.on(progress);
+        @Override
+        protected void onDraw(Canvas canvas) {
+            Drawable d = CursorStudioPrefs.createDrawable(getContext(), mStyle,
+                    CursorStudioPrefs.parseColor(mColor), mOpacity);
+            float density = getResources().getDisplayMetrics().density;
+            CursorStudioPrefs.applyBounds(d, mStyle, density * 1.6f * mSize / 100f);
+            canvas.save();
+            if (CursorStudioPrefs.isCentered(mStyle)) {
+                canvas.translate(getWidth() / 2f, getHeight() / 2f);
+            } else {
+                Drawable b = d;
+                canvas.translate((getWidth() - b.getBounds().width()) / 2f, (getHeight() - b.getBounds().height()) / 2f);
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        };
+            d.draw(canvas);
+            canvas.restore();
+        }
     }
 
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
+    /** Small static icon for a preset tile (always shown at 100% opacity, current color for tinted styles). */
+    private final class TileIcon extends View {
+        private final String style;
+        TileIcon(Context c, String style) { super(c); this.style = style; }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            Drawable d = CursorStudioPrefs.createDrawable(getContext(), style,
+                    CursorStudioPrefs.parseColor(mColor), 100);
+            float scale = getHeight() / (54f * 1.25f);
+            CursorStudioPrefs.applyBounds(d, style, scale * (CursorStudioPrefs.isCentered(style) ? 1.35f : 1f));
+            canvas.save();
+            if (CursorStudioPrefs.isCentered(style)) canvas.translate(getWidth() / 2f, getHeight() / 2f);
+            else canvas.translate((getWidth() - d.getBounds().width()) / 2f, (getHeight() - d.getBounds().height()) / 2f);
+            d.draw(canvas);
+            canvas.restore();
+        }
     }
 }

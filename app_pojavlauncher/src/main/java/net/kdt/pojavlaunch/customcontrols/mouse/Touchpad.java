@@ -16,6 +16,7 @@ import androidx.core.content.res.ResourcesCompat;
 import net.kdt.pojavlaunch.GrabListener;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.rkb.cursor.CursorStudioPrefs;
 
 import org.lwjgl.glfw.CallbackBridge;
 
@@ -84,15 +85,13 @@ public class Touchpad extends View implements GrabListener, AbstractTouchpad {
 
     private void init(){
         // Setup mouse pointer
-        mMousePointerDrawable = ResourcesCompat.getDrawable(getResources(), R.drawable.ic_mouse_pointer, getContext().getTheme());
-        // For some reason it's annotated as Nullable even though it doesn't seem to actually
-        // ever return null
-        assert mMousePointerDrawable != null;
-        mMousePointerDrawable.setBounds(
-                0, 0,
-                (int) (36 * LauncherPreferences.PREF_MOUSESCALE),
-                (int) (54 * LauncherPreferences.PREF_MOUSESCALE)
-        );
+        // RKB Cursor Studio: style/color/size/opacity come from the saved preferences. With the
+        // default settings this is the original pointer at the original size.
+        String cursorStyle = CursorStudioPrefs.getStyle();
+        mMousePointerDrawable = CursorStudioPrefs.createDrawable(getContext(), cursorStyle,
+                CursorStudioPrefs.getColorArgb(), CursorStudioPrefs.getOpacityPercent());
+        CursorStudioPrefs.applyBounds(mMousePointerDrawable, cursorStyle,
+                LauncherPreferences.PREF_MOUSESCALE * CursorStudioPrefs.getSizeMultiplier());
         setFocusable(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             setDefaultFocusHighlightEnabled(false);

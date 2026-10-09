@@ -36,8 +36,6 @@ public class MinecraftAccount {
      * Null or empty means disabled for this account.
      */
     public String skinUrl;
-    /** RKB Launcher: optional custom cape texture URL. */
-    public String capeUrl;
     private Bitmap mFaceCache;
     
     void updateSkinFace(String uuid) {
