@@ -219,6 +219,9 @@ public class ModManagerFragment extends Fragment {
         // Icon circle
         TextView icon = new TextView(requireContext());
         icon.setText("MOD");
+        icon.setTextSize(10);
+        icon.setTypeface(Typeface.DEFAULT_BOLD);
+        icon.setTextColor(ACCENT);
         icon.setTextSize(18);
         icon.setGravity(Gravity.CENTER);
         GradientDrawable iconBg = new GradientDrawable();

@@ -1,16 +1,13 @@
-RKB Launcher UI/Fix Patch
+RKB LAUNCHER - UI polish patch (based on supplied source archive)
 
-Files:
-- RkbHomeFragment.java: responsive RKB UI, working navigation, Discord invite, skin/cape URL dialog, existing launch system.
-- ModManagerFragment.java: RKB-themed mod card icon without emoji.
-- CursorStudioFragment.java: density-correct RKB layout spacing.
-- MinecraftAccount.java: stores capeUrl alongside the existing skinUrl.
-- build-apk.yml: builds an installable signed debug APK instead of release-unsigned APK.
+Contains focused, low-risk changes outside the Home screen:
+- Cursor Studio content now scrolls on smaller screens and uses density-independent padding; save button styling matches the RKB dark/neon-blue theme.
+- Mod Manager replaces the emoji icon with a simple text badge to match the requested non-emoji style.
+- Settings screen background uses the RKB dark background.
+- Controls editor system bars use the RKB dark theme.
 
-Discord invite configured in the RKB header:
-https://discord.gg/M2FskvuRJ7
+Home screen source is intentionally not included/changed, so its design remains as supplied.
 
-Important:
-- Skin URL uses the existing SkinUrlHandler system already present in the source.
-- Cape URL is persisted on the selected account. This source tree does not contain a real custom-cape renderer/injection API, so the patch does not fake one; a real cape renderer must consume capeUrl.
-- Minecraft FPS is not artificially capped or altered by this UI patch. The launcher UI avoids heavy images/animations and uses existing launcher performance settings.
+Optimization scope: small UI layout improvements only. This patch does not claim to fix launcher ANR, offline-mode crashes, update behavior, or Minecraft in-game custom cursor rendering. Those need targeted diagnosis/testing.
+
+Apply by extracting the app_pojavlauncher folder into the project root and allowing file merge/replace. Build with GitHub Actions and test before committing. This patch has not been Gradle-compiled in this environment.

@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
+import android.graphics.Color;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,7 +24,7 @@ public class LauncherPreferenceFragment extends PreferenceFragmentCompat impleme
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        view.setBackgroundColor(getResources().getColor(R.color.background_app));
+        view.setBackgroundColor(Color.rgb(5, 8, 15));
         super.onViewCreated(view, savedInstanceState);
     }
 

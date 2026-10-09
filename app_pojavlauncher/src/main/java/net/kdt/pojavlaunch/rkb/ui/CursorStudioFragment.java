@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,10 +36,17 @@ public class CursorStudioFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
+        ScrollView scroll = new ScrollView(requireContext());
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setBackgroundColor(0xFF05080F);
+
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(14), dp(16), dp(24));
+        root.setPadding(dp(20), dp(18), dp(20), dp(24));
         root.setBackgroundColor(0xFF05080F);
+        scroll.addView(root, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView title = new TextView(requireContext());
         title.setText("RKB Cursor Studio");
@@ -126,8 +134,14 @@ public class CursorStudioFragment extends Fragment {
         // Save
         Button save = new Button(requireContext());
         save.setText("SAVE & APPLY");
+        save.setAllCaps(false);
+        save.setTextSize(14);
+        save.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         save.setTextColor(0xFF021018);
-        save.setBackgroundColor(0xFF00B4FF);
+        GradientDrawable saveBg = new GradientDrawable();
+        saveBg.setColor(0xFF00A8FF);
+        saveBg.setCornerRadius(dp(12));
+        save.setBackground(saveBg);
         save.setOnClickListener(v -> {
             Toast.makeText(requireContext(),
                     "Cursor saved: " + CursorStudioPrefs.getStyle()
@@ -141,7 +155,7 @@ public class CursorStudioFragment extends Fragment {
         root.addView(save, saveLp);
 
         refreshLabels();
-        return root;
+        return scroll;
     }
 
     private void refreshLabels() {
@@ -178,7 +192,7 @@ public class CursorStudioFragment extends Fragment {
         tv.setText(t);
         tv.setTextColor(0xFF7A8FA8);
         tv.setTextSize(11);
-        tv.setPadding(0, 18, 0, 8);
+        tv.setPadding(0, dp(18), 0, dp(8));
         return tv;
     }
 
@@ -193,6 +207,7 @@ public class CursorStudioFragment extends Fragment {
         Button b = new Button(requireContext());
         b.setText(label);
         b.setTextSize(11);
+        b.setPadding(dp(4), 0, dp(4), 0);
         b.setAllCaps(false);
         boolean on = style.equals(CursorStudioPrefs.getStyle());
         b.setTextColor(on ? 0xFF021018 : 0xFFEEF6FF);
