@@ -25,6 +25,8 @@ import androidx.fragment.app.Fragment;
 import net.kdt.pojavlaunch.PojavProfile;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
+import net.kdt.pojavlaunch.rkb.skin.RkbSkinLoader;
+import net.kdt.pojavlaunch.rkb.skin.RkbSkinView;
 import net.kdt.pojavlaunch.value.MinecraftAccount;
 
 import java.io.File;
@@ -45,6 +47,7 @@ public class RkbSkinFragment extends Fragment {
     private final Handler mMain = new Handler(Looper.getMainLooper());
     private ExecutorService mExecutor;
     private EditText mSkinInput;
+    private int mSkinRequest;
 
     @Nullable
     @Override
@@ -84,6 +87,28 @@ public class RkbSkinFragment extends Fragment {
         accButtons.addView(add, new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f));
         accCard.addView(accButtons);
         body.addView(accCard);
+
+        // ---- skin preview (official profile skin for Microsoft accounts, default skin otherwise)
+        LinearLayout previewCard = RkbUi.card(c);
+        previewCard.addView(RkbUi.text(c, "Skin preview", 12, RkbUi.MUTED, true));
+        final RkbSkinView skinView = new RkbSkinView(c);
+        LinearLayout.LayoutParams svlp = new LinearLayout.LayoutParams(RkbUi.dp(c, 120), RkbUi.dp(c, 170));
+        svlp.gravity = Gravity.CENTER_HORIZONTAL;
+        svlp.topMargin = RkbUi.dp(c, 8);
+        previewCard.addView(skinView, svlp);
+        final TextView skinNote2 = RkbUi.text(c, "Loading skin...", 11, RkbUi.MUTED, false);
+        skinNote2.setGravity(Gravity.CENTER);
+        previewCard.addView(skinNote2);
+        LinearLayout.LayoutParams pclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pclp.topMargin = RkbUi.dp(c, 10);
+        body.addView(previewCard, pclp);
+        final int request = ++mSkinRequest;
+        RkbSkinLoader.load(c, acc, result -> {
+            if (request != mSkinRequest || !isAdded() || getView() == null) return; // view gone or account changed
+            skinView.setSkin(result.skin, result.slim);
+            skinNote2.setText(result.note != null ? result.note
+                    : (result.isDefault ? "Default skin" : "Skin of the signed-in profile"));
+        });
 
         // ---- skin url
         LinearLayout skinCard = RkbUi.card(c);
@@ -243,6 +268,7 @@ public class RkbSkinFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
+        mSkinRequest++; // drop any pending skin callback
         mMain.removeCallbacksAndMessages(null);
         if (mExecutor != null) mExecutor.shutdown(); // let an in-flight account save finish
         mExecutor = null;

@@ -91,6 +91,7 @@ public class ProfileEditorFragment extends Fragment implements CropperUtils.Crop
 
         // Set up behaviors
         mSaveButton.setOnClickListener(v -> {
+            v.setEnabled(false); // ignore repeated taps while saving
             ProfileIconCache.dropIcon(mProfileKey);
             save();
             Tools.backToMainMenu(requireActivity());

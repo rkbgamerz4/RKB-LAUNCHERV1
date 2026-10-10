@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- RKB neon-blue button: pressed / disabled / normal. Replaces the old 9-patch Minecraft button. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_pressed="true" android:drawable="@drawable/mine_button_focused" />
-    <item android:state_enabled="false" android:drawable="@drawable/mine_button_focused" />
-    <item android:drawable="@drawable/mine_button_unfocused" />
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp" />
+            <solid android:color="#FF0080C0" />
+            <stroke android:width="1dp" android:color="#FF00A8FF" />
+        </shape>
+    </item>
+    <item android:state_enabled="false">
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp" />
+            <solid android:color="#FF0E1423" />
+            <stroke android:width="1dp" android:color="#FF16314A" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp" />
+            <solid android:color="#FF00A8FF" />
+        </shape>
+    </item>
 </selector>

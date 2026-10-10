@@ -131,7 +131,11 @@ public class ModManagerFragment extends Fragment {
         rv.setLayoutManager(new LinearLayoutManager(c));
         rv.setHasFixedSize(false);
         rv.setClipToPadding(false);
-        rv.setPadding(0, RkbUi.dp(c, 8), 0, RkbUi.dp(c, 8));
+        rv.setNestedScrollingEnabled(true);
+        rv.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        rv.setItemViewCacheSize(10);
+        // extra bottom space so the last mod can scroll fully clear of the action row
+        rv.setPadding(0, RkbUi.dp(c, 8), 0, RkbUi.dp(c, 24));
         mAdapter = new ModAdapter();
         rv.setAdapter(mAdapter);
         listFrame.addView(rv, RkbUi.match());
@@ -319,21 +323,27 @@ public class ModManagerFragment extends Fragment {
         return m.metaName != null ? m.metaName : m.displayName;
     }
 
+    private final java.util.Set<String> mBusy = new java.util.HashSet<>();
+
     private void toggle(ModInfo mod) {
         if (mExecutor == null) return;
+        // ignore taps on a mod whose file move is still in flight (prevents double toggles)
+        if (!mBusy.add(mod.absolutePath)) return;
+        final String busyKey = mod.absolutePath;
         final File gameDir = getGameDir();
         final boolean wasEnabled = mod.enabled;
         try {
             mExecutor.execute(() -> {
                 final boolean ok = ModManager.toggleMod(gameDir, mod);
                 mMain.post(() -> {
+                    mBusy.remove(busyKey);
                     if (!isAdded() || mAdapter == null) return;
                     if (!ok) Toast.makeText(requireContext(), "Could not change " + title(mod), Toast.LENGTH_SHORT).show();
                     else Toast.makeText(requireContext(), (wasEnabled ? "Disabled " : "Enabled ") + title(mod), Toast.LENGTH_SHORT).show();
                     applyFilter();
                 });
             });
-        } catch (java.util.concurrent.RejectedExecutionException ignored) { }
+        } catch (java.util.concurrent.RejectedExecutionException ignored) { mBusy.remove(busyKey); }
     }
 
     private void bulk(boolean enable) {

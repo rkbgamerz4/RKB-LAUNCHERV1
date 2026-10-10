@@ -1,6 +1,17 @@
 package net.kdt.pojavlaunch.rkb.ui;
 
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -42,6 +53,15 @@ public class CursorStudioFragment extends Fragment {
     private String mColor;
     private int mSize;
     private int mOpacity;
+
+    private final Handler mMain = new Handler(Looper.getMainLooper());
+    private final ExecutorService mIo = Executors.newSingleThreadExecutor();
+
+    // Storage Access Framework: no storage permission needed, the user picks the location.
+    private final ActivityResultLauncher<String> mExportLauncher =
+            registerForActivityResult(new ActivityResultContracts.CreateDocument(), this::writeExport);
+    private final ActivityResultLauncher<String[]> mImportLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::readImport);
 
     private PreviewView mPreview;
     private TextView mSizeLabel, mOpacityLabel;
@@ -104,6 +124,19 @@ public class CursorStudioFragment extends Fragment {
         buttons.addView(reset, b1);
         buttons.addView(save, new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f));
         right.addView(buttons);
+
+        LinearLayout io = new LinearLayout(c);
+        TextView exp = RkbUi.button(c, "Export", false, v -> mExportLauncher.launch("rkb-cursor-preset.json"));
+        TextView imp = RkbUi.button(c, "Import", false, v -> mImportLauncher.launch(new String[]{"application/json", "text/plain", "*/*"}));
+        TextView shr = RkbUi.button(c, "Share", false, v -> sharePreset());
+        for (TextView t : new TextView[]{exp, imp, shr}) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 40), 1f);
+            lp.topMargin = RkbUi.dp(c, 8);
+            lp.rightMargin = RkbUi.dp(c, 6);
+            t.setTextSize(12);
+            io.addView(t, lp);
+        }
+        right.addView(io);
 
         TextView note = RkbUi.text(c, "Applies to the on-screen virtual mouse cursor the next time a game starts. "
                 + "Cursor drawn by Minecraft itself (menus with a grabbed mouse, crosshair) is not changed.",
@@ -205,6 +238,93 @@ public class CursorStudioFragment extends Fragment {
     private void refreshLabels() {
         mSizeLabel.setText("Size: " + mSize + "%");
         mOpacityLabel.setText("Opacity: " + mOpacity + "%");
+    }
+
+    // ---------------------------------------------------------------- export / import
+
+    private String currentPresetJson() throws org.json.JSONException {
+        return CursorStudioPrefs.toJson(mStyle, mColor, mSize, mOpacity);
+    }
+
+    private void writeExport(@Nullable Uri uri) {
+        if (uri == null) return; // user cancelled
+        final Context app = requireContext().getApplicationContext();
+        final String json;
+        try { json = currentPresetJson(); } catch (Exception e) { toast("Export failed: " + e.getMessage()); return; }
+        mIo.execute(() -> {
+            String msg;
+            try (OutputStream out = app.getContentResolver().openOutputStream(uri, "wt")) {
+                if (out == null) throw new java.io.IOException("could not open the file");
+                out.write(json.getBytes(StandardCharsets.UTF_8));
+                msg = "Preset exported";
+            } catch (Exception e) {
+                msg = "Export failed: " + e.getMessage();
+            }
+            final String m = msg;
+            mMain.post(() -> toast(m));
+        });
+    }
+
+    private void readImport(@Nullable Uri uri) {
+        if (uri == null) return;
+        final Context app = requireContext().getApplicationContext();
+        mIo.execute(() -> {
+            CursorStudioPrefs.Preset preset = null;
+            String error = null;
+            try (InputStream in = app.getContentResolver().openInputStream(uri)) {
+                if (in == null) throw new java.io.IOException("could not open the file");
+                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    bo.write(buf, 0, n);
+                    if (bo.size() > 64 * 1024) throw new IllegalArgumentException("File is too large for a preset");
+                }
+                preset = CursorStudioPrefs.fromJson(new String(bo.toByteArray(), StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                error = e.getMessage();
+            }
+            final CursorStudioPrefs.Preset p = preset;
+            final String err = error;
+            mMain.post(() -> {
+                if (!isAdded() || mPreview == null) return;
+                if (p == null) { toast("Import failed: " + err); return; }
+                mStyle = p.style; mColor = p.color; mSize = p.size; mOpacity = p.opacity;
+                mSizeBar.setProgress(mSize - 50);
+                mOpacityBar.setProgress(mOpacity - 20);
+                buildPresets(); buildColors(); refreshLabels(); mPreview.invalidate();
+                toast("Preset imported. Press Save to apply it.");
+            });
+        });
+    }
+
+    private void sharePreset() {
+        try {
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_SUBJECT, "RKB cursor preset");
+            send.putExtra(Intent.EXTRA_TEXT, currentPresetJson());
+            startActivity(Intent.createChooser(send, "Share cursor preset"));
+        } catch (Exception e) {
+            toast("Share failed: " + e.getMessage());
+        }
+    }
+
+    private void toast(String m) {
+        if (isAdded()) Toast.makeText(requireContext(), m, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onDestroyView() {
+        mMain.removeCallbacksAndMessages(null);
+        super.onDestroyView();
+        mPreview = null;
+    }
+
+    @Override
+    public void onDestroy() {
+        mIo.shutdown();
+        super.onDestroy();
     }
 
     // ---------------------------------------------------------------- actions

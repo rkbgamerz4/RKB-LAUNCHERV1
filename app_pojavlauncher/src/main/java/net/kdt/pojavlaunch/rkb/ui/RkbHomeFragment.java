@@ -25,7 +25,16 @@ import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.value.launcherprofiles.LauncherProfiles;
 import net.kdt.pojavlaunch.value.launcherprofiles.MinecraftProfile;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import net.kdt.pojavlaunch.rkb.skin.RkbSkinLoader;
+import net.kdt.pojavlaunch.rkb.skin.RkbSkinView;
+import net.kdt.pojavlaunch.value.MinecraftAccount;
+import net.kdt.pojavlaunch.extra.ExtraConstants;
+import net.kdt.pojavlaunch.extra.ExtraCore;
+import net.kdt.pojavlaunch.profiles.ProfileIconCache;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 
@@ -47,6 +56,8 @@ public class RkbHomeFragment extends Fragment {
     // Real data for the selected instance (loaded in loadInstance()).
     private String instName = "Minecraft";
     private String instVer = "";
+    private int instCount = 1;
+    private int mSkinRequest; // invalidates stale skin callbacks
 
     @Nullable
     @Override
@@ -296,7 +307,7 @@ public class RkbHomeFragment extends Fragment {
         );
         instance.setBackgroundResource(R.drawable.bg_rkb_instance);
         instance.setClickable(true);
-        instance.setOnClickListener(v -> editCurrentInstance());
+        instance.setOnClickListener(v -> showInstanceChooser());
 
         TextView accent = new TextView(requireContext());
         accent.setBackgroundColor(BLUE);
@@ -350,7 +361,7 @@ public class RkbHomeFragment extends Fragment {
 
         instanceText.addView(
                 text(
-                        instVer,
+                        instVer + (instCount > 1 ? "  \u2022  " + instCount + " instances" : ""),
                         12,
                         MUTED,
                         false
@@ -397,7 +408,7 @@ public class RkbHomeFragment extends Fragment {
 
         more.setGravity(Gravity.CENTER);
         more.setClickable(true);
-        more.setOnClickListener(v -> editCurrentInstance());
+        more.setOnClickListener(v -> showInstanceMenu(v));
 
         instance.addView(
                 more,
@@ -424,10 +435,7 @@ public class RkbHomeFragment extends Fragment {
 
         newInstance.setGravity(Gravity.CENTER);
         newInstance.setClickable(true);
-        newInstance.setOnClickListener(v -> {
-            if (isAdded()) Tools.swapFragment(requireActivity(), ProfileTypeSelectFragment.class,
-                    ProfileTypeSelectFragment.TAG, null);
-        });
+        newInstance.setOnClickListener(v -> openNewInstance());
         newInstance.setBackgroundResource(
                 R.drawable.bg_rkb_new_instance
         );
@@ -588,6 +596,12 @@ public class RkbHomeFragment extends Fragment {
     // =============================================================
 
     private void buildPlayerArea() {
+        final android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        final int hDp = Math.round(dm.heightPixels / dm.density);
+        final boolean tight = hDp < 440;
+        // Fixed rows (label, launch, version, gaps, account panel) must always fit; the skin preview
+        // is the only flexible element. Previously a fixed 205dp preview pushed LAUNCH off-screen.
+        final int previewH = Math.max(64, Math.min(205, hDp - (tight ? 270 : 330)));
 
         LinearLayout player =
                 new LinearLayout(requireContext());
@@ -598,14 +612,14 @@ public class RkbHomeFragment extends Fragment {
         player.setGravity(Gravity.CENTER_HORIZONTAL);
         player.setPadding(
                 dp(18),
-                dp(18),
+                dp(tight ? 8 : 18),
                 dp(18),
                 dp(10)
         );
 
         // PLAYER LABEL
         TextView label = text(
-                "Player",
+                RkbUi.accountName(requireContext()),
                 17,
                 WHITE,
                 true
@@ -626,8 +640,8 @@ public class RkbHomeFragment extends Fragment {
         player.addView(
                 label,
                 new LinearLayout.LayoutParams(
-                        dp(112),
-                        dp(48)
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        dp(tight ? 34 : 48)
                 )
         );
 
@@ -640,8 +654,8 @@ public class RkbHomeFragment extends Fragment {
         player.addView(
                 skin,
                 new LinearLayout.LayoutParams(
-                        dp(150),
-                        dp(205)
+                        dp(Math.max(48, previewH * 150 / 205)),
+                        dp(previewH)
                 )
         );
 
@@ -663,6 +677,8 @@ public class RkbHomeFragment extends Fragment {
                 R.drawable.bg_rkb_launch
         );
 
+        launch.setContentDescription("Launch Minecraft");
+        launch.setClickable(true);
         launch.setOnClickListener(
                 v -> launchMinecraft()
         );
@@ -671,7 +687,7 @@ public class RkbHomeFragment extends Fragment {
                 launch,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(78)
+                        dp(tight ? 62 : 78)
                 )
         );
 
@@ -693,7 +709,7 @@ public class RkbHomeFragment extends Fragment {
                 R.drawable.bg_rkb_version
         );
         version.setClickable(true);
-        version.setOnClickListener(v -> editCurrentInstance());
+        version.setOnClickListener(v -> showInstanceChooser());
 
         ImageView vPlay =
                 new ImageView(requireContext());
@@ -748,12 +764,17 @@ public class RkbHomeFragment extends Fragment {
                 version,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(58)
+                        dp(tight ? 46 : 58)
                 )
         );
 
+        android.widget.ScrollView playerScroll = new android.widget.ScrollView(requireContext());
+        playerScroll.setFillViewport(true);
+        playerScroll.setVerticalScrollBarEnabled(false);
+        playerScroll.addView(player, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         rightPanel.addView(
-                player,
+                playerScroll,
                 new LinearLayout.LayoutParams(
                         -1,
                         0,
@@ -767,112 +788,20 @@ public class RkbHomeFragment extends Fragment {
     // =============================================================
 
     private LinearLayout createPlayerPreview() {
-
-        LinearLayout wrapper =
-                new LinearLayout(requireContext());
-
-        wrapper.setOrientation(
-                LinearLayout.VERTICAL
-        );
-        wrapper.setGravity(Gravity.CENTER);
-
-        // HEAD
-        TextView head = text(
-                "■",
-                64,
-                Color.rgb(205, 150, 105),
-                true
-        );
-
-        head.setGravity(Gravity.CENTER);
-
-                wrapper.addView(
-                head,
-                new LinearLayout.LayoutParams(
-                        dp(70),
-                        dp(62)
-                )
-        );
-
-        // BODY
-        LinearLayout body =
-                new LinearLayout(requireContext());
-
-        body.setOrientation(
-                LinearLayout.HORIZONTAL
-        );
-
-        body.setGravity(Gravity.CENTER);
-
-        TextView leftArm = text(
-                "█",
-                42,
-                Color.rgb(20, 28, 40),
-                true
-        );
-
-        TextView torso = text(
-                "██",
-                50,
-                Color.rgb(24, 70, 125),
-                true
-        );
-
-        TextView rightArm = text(
-                "█",
-                42,
-                Color.rgb(20, 28, 40),
-                true
-        );
-
-        body.addView(leftArm);
-        body.addView(torso);
-        body.addView(rightArm);
-
-        wrapper.addView(
-                body,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(58)
-                )
-        );
-
-        // LEGS
-        LinearLayout legs =
-                new LinearLayout(requireContext());
-
-        legs.setGravity(Gravity.CENTER);
-
-        TextView leftLeg = text(
-                "█",
-                45,
-                Color.rgb(15, 35, 75),
-                true
-        );
-
-        TextView rightLeg = text(
-                "█",
-                45,
-                Color.rgb(15, 35, 75),
-                true
-        );
-
-        legs.addView(leftLeg);
-        legs.addView(rightLeg);
-
-        wrapper.addView(
-                legs,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(58)
-                )
-        );
-
-        return wrapper;
+        LinearLayout holder = new LinearLayout(requireContext());
+        holder.setGravity(Gravity.CENTER);
+        final RkbSkinView view = new RkbSkinView(requireContext());
+        holder.addView(view, new LinearLayout.LayoutParams(-1, -1));
+        // Resolved off the main thread: official profile skin for Microsoft accounts, default otherwise.
+        final int request = ++mSkinRequest;
+        final MinecraftAccount acc = RkbUi.currentAccount(requireContext());
+        RkbSkinLoader.load(requireContext(), acc, result -> {
+            if (request != mSkinRequest || !isAdded()) return; // screen rebuilt / destroyed
+            view.setSkin(result.skin, result.slim);
+        });
+        return holder;
     }
 
-    // =============================================================
-    // HEADER BUTTON
     // =============================================================
 
     private TextView smallButton(
@@ -913,6 +842,7 @@ public class RkbHomeFragment extends Fragment {
             MinecraftProfile p = key == null ? null : map.get(key);
             if (p == null) p = map.values().iterator().next();
             String n = Tools.isValidString(p.name) ? p.name : "Minecraft";
+            instCount = map.size();
             instName = n.length() > 14 ? n.substring(0, 13) + "\u2026" : n;
             String v = Tools.isValidString(p.lastVersionId) ? p.lastVersionId : "";
             if (MinecraftProfile.LATEST_RELEASE.equals(v)) v = "Latest release";
@@ -921,6 +851,94 @@ public class RkbHomeFragment extends Fragment {
         } catch (Exception ignored) {
             // keep the defaults; the Home screen must still render
         }
+    }
+
+    private void openNewInstance() {
+        if (!isAdded()) return;
+        // ignore repeated taps: only one "new instance" flow at a time
+        if (requireActivity().getSupportFragmentManager().findFragmentByTag(ProfileTypeSelectFragment.TAG) != null) return;
+        Tools.swapFragment(requireActivity(), ProfileTypeSelectFragment.class,
+                ProfileTypeSelectFragment.TAG, null);
+    }
+
+    /** All instances (sorted), current one checked. Selecting persists the choice. */
+    private void showInstanceChooser() {
+        if (!isAdded()) return;
+        try {
+            LauncherProfiles.load();
+            final Map<String, MinecraftProfile> map = LauncherProfiles.mainProfileJson.profiles;
+            final List<String> keys = new ArrayList<>(map.keySet());
+            Collections.sort(keys, (a, b) -> String.valueOf(map.get(a).name)
+                    .compareToIgnoreCase(String.valueOf(map.get(b).name)));
+            String cur = LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
+            String[] labels = new String[keys.size()];
+            int checked = 0;
+            for (int i = 0; i < keys.size(); i++) {
+                MinecraftProfile p = map.get(keys.get(i));
+                String n = Tools.isValidString(p.name) ? p.name : "Unnamed";
+                String v = Tools.isValidString(p.lastVersionId) ? p.lastVersionId : "?";
+                if (MinecraftProfile.LATEST_RELEASE.equals(v)) v = "Latest release";
+                else if (MinecraftProfile.LATEST_SNAPSHOT.equals(v)) v = "Latest snapshot";
+                labels[i] = n + "  \u2014  " + v;
+                if (keys.get(i).equals(cur)) checked = i;
+            }
+            new android.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Instances (" + keys.size() + ")")
+                    .setSingleChoiceItems(labels, checked, (d, which) -> {
+                        LauncherPreferences.DEFAULT_PREF.edit()
+                                .putString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, keys.get(which)).commit();
+                        d.dismiss();
+                        if (isAdded()) buildUi();
+                    })
+                    .setNeutralButton("New instance", (d, w) -> openNewInstance())
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Could not read instances: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showInstanceMenu(View anchor) {
+        android.widget.PopupMenu pm = new android.widget.PopupMenu(requireContext(), anchor);
+        pm.getMenu().add(0, 1, 0, "Edit instance");
+        pm.getMenu().add(0, 2, 1, "Switch instance");
+        pm.getMenu().add(0, 3, 2, "Delete instance");
+        pm.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) editCurrentInstance();
+            else if (item.getItemId() == 2) showInstanceChooser();
+            else confirmDeleteInstance();
+            return true;
+        });
+        pm.show();
+    }
+
+    private void confirmDeleteInstance() {
+        if (!isAdded()) return;
+        if (instCount < 2) {
+            Toast.makeText(requireContext(), "You need at least one instance", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle("Delete " + instName + "?")
+                .setMessage("This removes the instance from the launcher. Its world and mod files on disk are not deleted.")
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("Delete", (d, w) -> {
+                    try {
+                        LauncherProfiles.load();
+                        String key = LauncherPreferences.DEFAULT_PREF.getString(
+                                LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
+                        Map<String, MinecraftProfile> map = LauncherProfiles.mainProfileJson.profiles;
+                        if (key == null || !map.containsKey(key) || map.size() < 2) return;
+                        ProfileIconCache.dropIcon(key);
+                        map.remove(key);
+                        LauncherProfiles.write();
+                        LauncherPreferences.DEFAULT_PREF.edit().putString(
+                                LauncherPreferences.PREF_KEY_CURRENT_PROFILE, map.keySet().iterator().next()).commit();
+                    } catch (Exception e) {
+                        Toast.makeText(requireContext(), "Delete failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                    if (isAdded()) buildUi();
+                }).show();
     }
 
     private void editCurrentInstance() {

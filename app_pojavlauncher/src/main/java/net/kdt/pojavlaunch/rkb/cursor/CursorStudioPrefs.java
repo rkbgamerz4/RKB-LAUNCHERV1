@@ -155,4 +155,46 @@ public final class CursorStudioPrefs {
             d.setBounds(0, 0, Math.round(36 * scale), Math.round(54 * scale));
         }
     }
+
+    // ---------------------------------------------------------------- export / import (JSON)
+
+    public static final String PRESET_FORMAT = "rkb-cursor-preset";
+
+    /** Parsed + validated preset (values already clamped). */
+    public static final class Preset {
+        public final String style, color;
+        public final int size, opacity;
+        Preset(String style, String color, int size, int opacity) {
+            this.style = style; this.color = color; this.size = size; this.opacity = opacity;
+        }
+    }
+
+    public static String toJson(String style, String colorHex, int size, int opacity) throws org.json.JSONException {
+        return new org.json.JSONObject()
+                .put("format", PRESET_FORMAT)
+                .put("version", 1)
+                .put("style", normalizeStyle(style))
+                .put("color", colorHex)
+                .put("size", clamp(size, 50, 150))
+                .put("opacity", clamp(opacity, 20, 100))
+                .toString(2);
+    }
+
+    /** @throws IllegalArgumentException with a user-facing message when the file is not a valid preset. */
+    public static Preset fromJson(String json) {
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(json);
+            if (!PRESET_FORMAT.equals(o.optString("format"))) {
+                throw new IllegalArgumentException("This file is not an RKB cursor preset");
+            }
+            String style = o.getString("style");
+            if (!normalizeStyle(style).equals(style)) throw new IllegalArgumentException("Unknown cursor style: " + style);
+            String color = o.getString("color");
+            if (!color.matches("#[0-9a-fA-F]{6}")) throw new IllegalArgumentException("Invalid color value");
+            return new Preset(style, color.toUpperCase(java.util.Locale.ROOT),
+                    clamp(o.getInt("size"), 50, 150), clamp(o.getInt("opacity"), 20, 100));
+        } catch (org.json.JSONException e) {
+            throw new IllegalArgumentException("The file is not valid preset JSON");
+        }
+    }
 }

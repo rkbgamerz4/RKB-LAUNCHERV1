@@ -236,6 +236,12 @@ public final class RkbUi {
         LinearLayout root = new LinearLayout(c);
         root.setOrientation(LinearLayout.HORIZONTAL);
         root.setBackgroundColor(BG);
+        // keep content clear of system bars / display cutouts
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            return insets;
+        });
         root.addView(buildSidebar(c, active), new LinearLayout.LayoutParams(dp(c, navItemSize(c) + 22), ViewGroup.LayoutParams.MATCH_PARENT));
 
         LinearLayout col = new LinearLayout(c);

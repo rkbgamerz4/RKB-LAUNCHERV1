@@ -17,7 +17,10 @@ public class MineEditText extends androidx.appcompat.widget.AppCompatEditText {
 	}
 
 	public void init() {
-		setBackgroundColor(Color.parseColor("#131313"));
-		setPadding(5, 5, 5, 5);
+		setBackgroundResource(net.kdt.pojavlaunch.R.drawable.rkb_input_background);
+		int pad = Math.round(10 * getResources().getDisplayMetrics().density);
+		setPadding(pad, pad / 2, pad, pad / 2);
+		setTextColor(Color.WHITE);
+		setHintTextColor(Color.parseColor("#7A8FA8"));
 	}
 }
