@@ -201,7 +201,7 @@ public class RkbHomeFragment extends Fragment {
 
         TextView launcher = text(
                 "RKB LAUNCHER",
-                18,
+                headerButtonWidth() > 100 ? 18 : 15,
                 WHITE,
                 true
         );
@@ -214,8 +214,10 @@ public class RkbHomeFragment extends Fragment {
         );
 
         logoText.addView(launcher);
-        logoText.addView(space(2));
-        logoText.addView(slogan);
+        if (headerButtonWidth() > 100) { // slogan only when there is room
+            logoText.addView(space(2));
+            logoText.addView(slogan);
+        }
 
         logoBox.addView(logoText);
 
@@ -238,7 +240,7 @@ public class RkbHomeFragment extends Fragment {
         header.addView(
                 youtube,
                 new LinearLayout.LayoutParams(
-                        dp(118),
+                        dp(headerButtonWidth()),
                         dp(46)
                 )
         );
@@ -255,7 +257,7 @@ public class RkbHomeFragment extends Fragment {
         header.addView(
                 discord,
                 new LinearLayout.LayoutParams(
-                        dp(118),
+                        dp(headerButtonWidth()),
                         dp(46)
                 )
         );
@@ -503,7 +505,7 @@ public class RkbHomeFragment extends Fragment {
                 R.drawable.bg_rkb_account
         );
         account.setClickable(true);
-        account.setOnClickListener(v -> RkbNav.go(requireActivity(), RkbNav.Dest.SKIN));
+        account.setOnClickListener(v -> RkbNav.openAccount(requireActivity()));
 
         TextView avatar = text(
                 "R",
@@ -831,6 +833,17 @@ public class RkbHomeFragment extends Fragment {
     // =============================================================
     // LAUNCH
     // =============================================================
+
+    /** Called by LauncherActivity after login / account switch: re-reads account + skin. */
+    public void refreshAccount() {
+        if (isAdded() && getView() != null) buildUi();
+    }
+
+    private int headerButtonWidth() {
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        float centreDp = dm.widthPixels / dm.density * 0.55f - 70f; // space left of the player panel
+        return centreDp < 420f ? 84 : 118;
+    }
 
     private void loadInstance() {
         try {

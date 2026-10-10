@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rkb_create_title">What do you want to create?</string>
+    <string name="rkb_create_hint">You can pick the game version on the next screen.</string>
+    <string name="rkb_create_vanilla_sub">Release or snapshot, no mod loader</string>
+    <string name="rkb_create_optifine_sub">Install OptiFine for a version</string>
+    <string name="rkb_create_fabric_sub">Fabric loader for a Minecraft version</string>
+    <string name="rkb_create_quilt_sub">Quilt loader for a Minecraft version</string>
+    <string name="rkb_create_forge_sub">Forge installer for a Minecraft version</string>
+    <string name="rkb_create_modpack_sub">Search and install a modpack</string>
+    <string name="rkb_create_bta_sub">Better than Adventure</string>
+    <string name="rkb_auth_kicker">IDENTITY  \u00B7  SIGN IN</string>
+    <string name="rkb_auth_ms_card">Microsoft account\nPremium \u00B7 full online play</string>
+    <string name="rkb_auth_local_card">Local profile\nOffline \u00B7 pick any name, no password</string>
+    <string name="rkb_auth_note">Credentials go straight to the provider \u2014 the launcher never sees your password.</string>
+</resources>

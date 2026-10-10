@@ -31,6 +31,16 @@ public class SelectAuthFragment extends Fragment {
         Button mLocalButton = view.findViewById(R.id.button_local_authentication);
         Button mDiscordButton = view.findViewById(R.id.button_discord_link);
 
+        // Microsoft stays the filled neon primary action; the others are outlined navy cards.
+        for (Button b : new Button[]{mMicrosoftButton, mLocalButton, mDiscordButton}) {
+            b.setAllCaps(false);
+            b.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
+            b.setPadding(Math.round(18 * getResources().getDisplayMetrics().density), 0,
+                    Math.round(18 * getResources().getDisplayMetrics().density), 0);
+        }
+        mLocalButton.setBackgroundResource(R.drawable.rkb_item_card);
+        mDiscordButton.setBackgroundResource(R.drawable.rkb_item_card);
+
         mMicrosoftButton.setOnClickListener(v ->
                 Tools.swapFragment(requireActivity(), MicrosoftLoginFragment.class, MicrosoftLoginFragment.TAG, null));
 

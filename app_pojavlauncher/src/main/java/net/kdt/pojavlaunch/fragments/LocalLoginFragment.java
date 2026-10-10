@@ -42,7 +42,9 @@ public class LocalLoginFragment extends Fragment {
             ExtraCore.setValue(ExtraConstants.MOJANG_LOGIN_TODO, new String[]{
                     mUsernameEditText.getText().toString(), "" });
 
-            Tools.swapFragment(requireActivity(), MainMenuFragment.class, MainMenuFragment.TAG, null);
+            v.setEnabled(false); // ignore repeated taps; the account is created by LauncherActivity
+            // Back to the RKB Home (root). LauncherActivity creates the account and refreshes Home.
+            Tools.backToMainMenu(requireActivity());
         });
     }
 

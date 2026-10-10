@@ -45,6 +45,12 @@ public final class RkbUi {
         return Math.round(v * c.getResources().getDisplayMetrics().density);
     }
 
+    /** Short landscape phones: every dp of height matters for lists (Settings, Mods...). */
+    public static boolean isShort(Context c) {
+        DisplayMetrics m = c.getResources().getDisplayMetrics();
+        return m.heightPixels / m.density < 480f;
+    }
+
     public static boolean isCompact(Context c) {
         DisplayMetrics m = c.getResources().getDisplayMetrics();
         return m.widthPixels / m.density < 600f;
@@ -127,8 +133,8 @@ public final class RkbUi {
         DisplayMetrics m = c.getResources().getDisplayMetrics();
         float hDp = m.heightPixels / m.density;
         int count = RkbNav.Dest.values().length;
-        float size = (hDp - 36f) / count - 8f;
-        return Math.round(Math.max(40f, Math.min(56f, size)));
+        float size = (hDp - 28f) / count - 6f;
+        return Math.round(Math.max(36f, Math.min(56f, size)));
     }
 
     /** Fills the sidebar container with one real, clickable item per destination. */
@@ -140,7 +146,7 @@ public final class RkbUi {
             ImageView item = new ImageView(c);
             item.setImageResource(d.icon);
             item.setColorFilter(d == active ? WHITE : MUTED);
-            int pad = dp(c, size >= 52 ? 13 : 10);
+            int pad = dp(c, size >= 52 ? 13 : 9);
             item.setPadding(pad, pad, pad, pad);
             item.setBackgroundResource(d == active ? R.drawable.bg_rkb_nav_item_active : R.drawable.bg_rkb_nav_item);
             item.setContentDescription(d.label);
@@ -154,7 +160,7 @@ public final class RkbUi {
                 if (ctx instanceof Activity) RkbNav.go((Activity) ctx, d);
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(c, size), dp(c, size));
-            lp.bottomMargin = dp(c, 8);
+            lp.bottomMargin = dp(c, 6);
             sidebar.addView(item, lp);
         }
     }
@@ -163,7 +169,7 @@ public final class RkbUi {
         LinearLayout col = new LinearLayout(c);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER_HORIZONTAL);
-        col.setPadding(dp(c, 10), dp(c, 12), dp(c, 10), dp(c, 12));
+        col.setPadding(dp(c, 10), dp(c, 8), dp(c, 10), dp(c, 8));
         populateSidebar(col, active);
         ScrollView sv = new ScrollView(c);
         sv.setFillViewport(true);
@@ -178,13 +184,13 @@ public final class RkbUi {
         boolean compact = isCompact(c);
         LinearLayout header = new LinearLayout(c);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(c, 12), dp(c, 6), dp(c, 12), dp(c, 6));
+        header.setPadding(dp(c, 12), dp(c, isShort(c) ? 3 : 6), dp(c, 12), dp(c, isShort(c) ? 3 : 6));
         header.setBackgroundResource(R.drawable.bg_rkb_header);
 
         TextView logo = text(c, "R", 20, BLUE, true);
         logo.setGravity(Gravity.CENTER);
         logo.setBackgroundResource(R.drawable.bg_rkb_logo);
-        header.addView(logo, new LinearLayout.LayoutParams(dp(c, 40), dp(c, 40)));
+        header.addView(logo, new LinearLayout.LayoutParams(dp(c, isShort(c) ? 34 : 40), dp(c, isShort(c) ? 34 : 40)));
 
         LinearLayout names = new LinearLayout(c);
         names.setOrientation(LinearLayout.VERTICAL);
@@ -208,7 +214,7 @@ public final class RkbUi {
             while (ctx instanceof android.content.ContextWrapper && !(ctx instanceof Activity)) {
                 ctx = ((android.content.ContextWrapper) ctx).getBaseContext();
             }
-            if (ctx instanceof Activity) RkbNav.go((Activity) ctx, RkbNav.Dest.SKIN);
+            if (ctx instanceof Activity) RkbNav.openAccount((Activity) ctx);
         });
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(c, 36));
         alp.leftMargin = dp(c, 8);
@@ -246,14 +252,15 @@ public final class RkbUi {
 
         LinearLayout col = new LinearLayout(c);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(dp(c, 12), dp(c, 8), dp(c, 12), dp(c, 8));
-        col.addView(buildHeader(c), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 54)));
+        col.setPadding(dp(c, 12), dp(c, isShort(c) ? 4 : 8), dp(c, 12), dp(c, isShort(c) ? 4 : 8));
+        final boolean shortScreen = isShort(c);
+        col.addView(buildHeader(c), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, shortScreen ? 46 : 54)));
 
         LinearLayout titles = new LinearLayout(c);
         titles.setOrientation(LinearLayout.VERTICAL);
-        titles.setPadding(dp(c, 4), dp(c, 10), 0, dp(c, 8));
-        titles.addView(text(c, title, 20, WHITE, true));
-        if (subtitle != null) titles.addView(text(c, subtitle, 12, MUTED, false));
+        titles.setPadding(dp(c, 4), dp(c, shortScreen ? 4 : 10), 0, dp(c, shortScreen ? 4 : 8));
+        titles.addView(text(c, title, shortScreen ? 16 : 20, WHITE, true));
+        if (subtitle != null && !shortScreen) titles.addView(text(c, subtitle, 12, MUTED, false));
         col.addView(titles);
 
         col.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));

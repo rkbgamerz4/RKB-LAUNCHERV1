@@ -13,13 +13,13 @@ public final class RkbNav {
     private RkbNav() {}
 
     public enum Dest {
-        HOME("rkb_home", "Home", R.drawable.ic_rkb_play),
-        CURSOR("rkb_cursor", "Cursor Studio", android.R.drawable.ic_menu_crop),
-        MODS("rkb_mods", "Mod Manager", android.R.drawable.ic_menu_manage),
-        CONTROLS("rkb_controls", "Controls", android.R.drawable.ic_media_play),
-        SKIN("rkb_skin", "Skin & Account", android.R.drawable.ic_menu_myplaces),
-        ABOUT("rkb_about", "About", android.R.drawable.ic_menu_info_details),
-        SETTINGS("rkb_settings", "Settings", android.R.drawable.ic_menu_preferences);
+        HOME("rkb_home", "Home", R.drawable.ic_rkb_nav_home),
+        CURSOR("rkb_cursor", "Cursor Studio", R.drawable.ic_rkb_nav_cursor),
+        MODS("rkb_mods", "Mod Manager", R.drawable.ic_rkb_nav_mods),
+        CONTROLS("rkb_controls", "Controls", R.drawable.ic_rkb_nav_controls),
+        SKIN("rkb_skin", "Skin & Account", R.drawable.ic_rkb_nav_skin),
+        ABOUT("rkb_about", "About", R.drawable.ic_rkb_nav_about),
+        SETTINGS("rkb_settings", "Settings", R.drawable.ic_rkb_nav_settings);
 
         public final String tag;
         public final String label;
@@ -41,6 +41,18 @@ public final class RkbNav {
             case SETTINGS: return new RkbSettingsFragment();
             case HOME:
             default: return new RkbHomeFragment();
+        }
+    }
+
+    /** Account entry point: not signed in -> the RKB auth-method screen, otherwise Skin & Account. */
+    public static void openAccount(Activity activity) {
+        if (!(activity instanceof LauncherActivity)) return;
+        if (RkbUi.currentAccount(activity) == null) {
+            net.kdt.pojavlaunch.Tools.swapFragment((LauncherActivity) activity,
+                    net.kdt.pojavlaunch.fragments.SelectAuthFragment.class,
+                    net.kdt.pojavlaunch.fragments.SelectAuthFragment.TAG, null);
+        } else {
+            go(activity, Dest.SKIN);
         }
     }
 

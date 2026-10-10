@@ -1126,9 +1126,12 @@ public final class Tools {
     /** Swap the main fragment with another */
     public static void swapFragment(FragmentActivity fragmentActivity , Class<? extends Fragment> fragmentClass,
                                     @Nullable String fragmentTag, @Nullable Bundle bundle) {
-        // When people tab out, it might happen
-        //TODO handle custom animations
-        fragmentActivity.getSupportFragmentManager().beginTransaction()
+        androidx.fragment.app.FragmentManager fm = fragmentActivity.getSupportFragmentManager();
+        if (fm.isStateSaved()) return; // a transaction now would throw IllegalStateException
+        Fragment visible = fm.findFragmentById(R.id.container_fragment);
+        // repeated taps must not stack the same screen twice
+        if (visible != null && fragmentTag != null && fragmentTag.equals(visible.getTag())) return;
+        fm.beginTransaction()
                 .setReorderingAllowed(true)
                 .addToBackStack(fragmentClass.getName())
                 .replace(R.id.container_fragment, fragmentClass, bundle, fragmentTag).commit();

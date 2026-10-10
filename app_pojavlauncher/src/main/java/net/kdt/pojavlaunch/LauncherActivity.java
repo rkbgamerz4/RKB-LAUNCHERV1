@@ -26,6 +26,12 @@ import androidx.fragment.app.FragmentManager;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
+import net.kdt.pojavlaunch.authenticator.microsoft.MicrosoftBackgroundLogin;
+import net.kdt.pojavlaunch.value.MinecraftAccount;
+import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
+import net.kdt.pojavlaunch.rkb.ui.RkbSkinFragment;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import net.kdt.pojavlaunch.fragments.ProfileEditorFragment;
 import net.kdt.pojavlaunch.tasks.AsyncMinecraftDownloader.DoneListener;
 import net.kdt.pojavlaunch.lifecycle.ContextAwareDoneListener;
@@ -58,6 +64,8 @@ public class LauncherActivity extends AppCompatActivity {
     private ProgressServiceKeeper mProgressServiceKeeper;
     private long mLastBackPress;
     private boolean mLaunching;          // blocks accidental double launches
+    private final ExecutorService mIo = Executors.newSingleThreadExecutor();
+    private boolean mLoginRunning;
     private LinearLayout mLaunchOverlay;
     private TextView mLaunchOverlayText;
 
@@ -89,6 +97,21 @@ public class LauncherActivity extends AppCompatActivity {
         return false;
     };
 
+    /**
+     * Local/offline profile requested by LocalLoginFragment. Nothing consumed this request before,
+     * and the fragment opened the stock PojavLauncher main menu instead (the "default Home" bug).
+     */
+    private final ExtraListener<String[]> mLocalLoginListener = (key, value) -> {
+        if (value != null && value.length > 0) runOnUiThread(() -> createLocalAccount(value[0]));
+        return false;
+    };
+
+    /** Microsoft redirect captured by MicrosoftLoginFragment (same missing-consumer problem). */
+    private final ExtraListener<android.net.Uri> mMicrosoftLoginListener = (key, value) -> {
+        if (value != null) runOnUiThread(() -> runMicrosoftLogin(value));
+        return false;
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -112,6 +135,8 @@ public class LauncherActivity extends AppCompatActivity {
 
         ExtraCore.addExtraListener(ExtraConstants.LAUNCH_GAME, mLaunchGameListener);
         ExtraCore.addExtraListener(ExtraConstants.REFRESH_VERSION_SPINNER, mRefreshProfileListener);
+        ExtraCore.addExtraListener(ExtraConstants.MOJANG_LOGIN_TODO, mLocalLoginListener);
+        ExtraCore.addExtraListener(ExtraConstants.MICROSOFT_LOGIN_TODO, mMicrosoftLoginListener);
         refreshVersionList();
         installBackHandler();
 
@@ -217,6 +242,12 @@ public class LauncherActivity extends AppCompatActivity {
             return;
         }
 
+        MinecraftAccount account = RkbUi.currentAccount(this);
+        if (account.isMicrosoft && account.expiresAt > 0 && account.expiresAt < System.currentTimeMillis()) {
+            refreshExpiredSessionThenLaunch(account);
+            return;
+        }
+
         MinecraftProfile profile = resolveSelectedProfile(); // also persists the selection
         if (profile == null || !Tools.isValidString(profile.lastVersionId)) {
             Toast.makeText(this, "No usable instance. Create one with New Instance first.", Toast.LENGTH_LONG).show();
@@ -238,6 +269,96 @@ public class LauncherActivity extends AppCompatActivity {
         } catch (RuntimeException e) {
             setLaunching(false, null);
             Tools.showError(this, e);
+        }
+    }
+
+    // ------------------------------------------------------------------ accounts
+
+    private void createLocalAccount(final String username) {
+        final String name = username == null ? "" : username.trim();
+        if (name.isEmpty()) return;
+        mIo.execute(() -> {
+            String error = null;
+            try {
+                MinecraftAccount acc = new MinecraftAccount(); // defaults = local (token "0", zero UUID)
+                acc.username = name;
+                acc.save();
+            } catch (Exception e) {
+                android.util.Log.e("RKB-Login", "Could not save local account", e);
+                error = e.getMessage();
+            }
+            final String err = error;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (err != null) {
+                    Toast.makeText(this, "Could not create the profile: " + err, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                PojavProfile.setCurrentProfile(this, name);
+                refreshAccountUi();
+                Toast.makeText(this, "Signed in as " + name, Toast.LENGTH_SHORT).show();
+            });
+        });
+    }
+
+    private void runMicrosoftLogin(android.net.Uri redirect) {
+        final String code = redirect.getQueryParameter("code");
+        if (code == null || code.isEmpty()) {
+            Toast.makeText(this, "Microsoft sign-in was cancelled or failed", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (mLoginRunning) return; // duplicate callback
+        mLoginRunning = true;
+        setLaunching(true, "Signing in...");
+        new MicrosoftBackgroundLogin(false, code).performLogin(
+                step -> { if (mLaunchOverlayText != null) mLaunchOverlayText.setText("Signing in (" + step + "/5)..."); },
+                account -> {
+                    mLoginRunning = false;
+                    setLaunching(false, null);
+                    PojavProfile.setCurrentProfile(this, account.username);
+                    refreshAccountUi();
+                    Toast.makeText(this, "Signed in as " + account.username, Toast.LENGTH_SHORT).show();
+                },
+                error -> {
+                    mLoginRunning = false;
+                    setLaunching(false, null);
+                    Tools.showError(this, error);
+                });
+    }
+
+    /** Microsoft sessions expire; refresh with the stored refresh token instead of launching with a dead token. */
+    private void refreshExpiredSessionThenLaunch(MinecraftAccount stale) {
+        if (mLoginRunning) return;
+        mLoginRunning = true;
+        setLaunching(true, "Refreshing your Microsoft session...");
+        new MicrosoftBackgroundLogin(true, stale.msaRefreshToken).performLogin(
+                null,
+                account -> {
+                    mLoginRunning = false;
+                    setLaunching(false, null);
+                    refreshAccountUi();
+                    startLaunchFlow();
+                },
+                error -> {
+                    mLoginRunning = false;
+                    setLaunching(false, null);
+                    Toast.makeText(this, "Your session expired and could not be refreshed (offline?). "
+                            + "Connect to the internet or sign in again.", Toast.LENGTH_LONG).show();
+                    android.util.Log.w("RKB-Login", "session refresh failed: " + error);
+                });
+    }
+
+    /** Rebuilds whatever RKB screen is visible so the account name, badge and skin are re-read. */
+    public void refreshAccountUi() {
+        if (isFinishing() || isDestroyed()) return;
+        FragmentManager fm = getSupportFragmentManager();
+        if (fm.isStateSaved()) return;
+        Fragment cur = fm.findFragmentById(R.id.container_fragment);
+        if (cur instanceof RkbHomeFragment) {
+            ((RkbHomeFragment) cur).refreshAccount();
+        } else if (cur != null && cur.getTag() != null && cur.getTag().startsWith("rkb_")) {
+            fm.beginTransaction().setReorderingAllowed(true).detach(cur).commit();
+            fm.beginTransaction().setReorderingAllowed(true).attach(cur).commit();
         }
     }
 
@@ -346,6 +467,9 @@ public class LauncherActivity extends AppCompatActivity {
     protected void onDestroy() {
         ExtraCore.removeExtraListenerFromValue(ExtraConstants.LAUNCH_GAME, mLaunchGameListener);
         ExtraCore.removeExtraListenerFromValue(ExtraConstants.REFRESH_VERSION_SPINNER, mRefreshProfileListener);
+        ExtraCore.removeExtraListenerFromValue(ExtraConstants.MOJANG_LOGIN_TODO, mLocalLoginListener);
+        ExtraCore.removeExtraListenerFromValue(ExtraConstants.MICROSOFT_LOGIN_TODO, mMicrosoftLoginListener);
+        mIo.shutdown();
         if (mProgressServiceKeeper != null) ProgressKeeper.removeTaskCountListener(mProgressServiceKeeper);
         super.onDestroy();
     }
