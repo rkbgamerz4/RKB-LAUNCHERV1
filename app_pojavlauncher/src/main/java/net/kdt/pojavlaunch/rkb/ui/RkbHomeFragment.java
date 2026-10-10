@@ -14,6 +14,7 @@ import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -25,6 +26,8 @@ import net.kdt.pojavlaunch.fragments.ProfileTypeSelectFragment;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.value.launcherprofiles.LauncherProfiles;
 import net.kdt.pojavlaunch.value.launcherprofiles.MinecraftProfile;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -135,7 +138,7 @@ public class RkbHomeFragment extends Fragment {
         root.addView(center, centerParams);
 
         buildHeader();
-        buildCenterSpace();
+        buildCenterSpace(sideW, rightW);
         buildInstanceRow();
 
         // =========================================================
@@ -146,9 +149,9 @@ public class RkbHomeFragment extends Fragment {
         rightPanel.setOrientation(LinearLayout.VERTICAL);
         rightPanel.setPadding(
                 dp(12),
-                dp(8),
-                dp(18),
-                dp(14)
+                dp(6),
+                dp(14),
+                dp(8)
         );
 
         FrameLayout.LayoutParams rightParams =
@@ -241,7 +244,7 @@ public class RkbHomeFragment extends Fragment {
                 youtube,
                 new LinearLayout.LayoutParams(
                         dp(headerButtonWidth()),
-                        dp(46)
+                        dp(RkbUi.isShort(requireContext()) ? 38 : 44)
                 )
         );
 
@@ -258,7 +261,7 @@ public class RkbHomeFragment extends Fragment {
                 discord,
                 new LinearLayout.LayoutParams(
                         dp(headerButtonWidth()),
-                        dp(46)
+                        dp(RkbUi.isShort(requireContext()) ? 38 : 44)
                 )
         );
 
@@ -275,18 +278,139 @@ public class RkbHomeFragment extends Fragment {
     // CENTER EMPTY SPACE
     // =============================================================
 
-    private void buildCenterSpace() {
+    private static final class InstanceItem {
+        final String key, name, version;
+        final boolean selected;
+        InstanceItem(String key, String name, String version, boolean selected) {
+            this.key = key; this.name = name; this.version = version; this.selected = selected;
+        }
+    }
 
-        Space space = new Space(requireContext());
+    /** All instances from launcher_profiles.json (the real Pojav store), sorted by name. */
+    private List<InstanceItem> readInstances() {
+        List<InstanceItem> out = new ArrayList<>();
+        try {
+            LauncherProfiles.load();
+            final Map<String, MinecraftProfile> map = LauncherProfiles.mainProfileJson.profiles;
+            if (map == null) return out;
+            String cur = LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
+            if (cur == null || !map.containsKey(cur)) cur = map.isEmpty() ? null : map.keySet().iterator().next();
+            for (Map.Entry<String, MinecraftProfile> e : map.entrySet()) {
+                MinecraftProfile p = e.getValue();
+                String v = Tools.isValidString(p.lastVersionId) ? p.lastVersionId : "?";
+                if (MinecraftProfile.LATEST_RELEASE.equals(v)) v = "Latest release";
+                else if (MinecraftProfile.LATEST_SNAPSHOT.equals(v)) v = "Latest snapshot";
+                out.add(new InstanceItem(e.getKey(), Tools.isValidString(p.name) ? p.name : "Unnamed", v, e.getKey().equals(cur)));
+            }
+            Collections.sort(out, (x, y) -> x.name.compareToIgnoreCase(y.name));
+        } catch (Exception e) {
+            android.util.Log.w("RKB-Home", "could not read instances", e);
+        }
+        return out;
+    }
 
-        center.addView(
-                space,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        0,
-                        1
-                )
-        );
+    private void buildCenterSpace(int sideW, int rightW) {
+        final List<InstanceItem> items = readInstances();
+        TextView title = text("INSTANCES  \u2022  " + items.size(), 11, MUTED, true);
+        title.setPadding(dp(4), dp(8), 0, dp(4));
+        center.addView(title);
+
+        if (items.isEmpty()) {
+            TextView empty = text("No instances yet. Tap New Instance to create one.", 13, MUTED, false);
+            empty.setGravity(Gravity.CENTER);
+            center.addView(empty, new LinearLayout.LayoutParams(-1, 0, 1));
+            return;
+        }
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        float centreDp = (dm.widthPixels - sideW - rightW) / dm.density - 30f;
+        int span = Math.max(1, (int) (centreDp / 190f));
+        RecyclerView rv = new RecyclerView(requireContext());
+        rv.setLayoutManager(new GridLayoutManager(requireContext(), span));
+        rv.setClipToPadding(false);
+        rv.setPadding(0, 0, 0, dp(8));
+        rv.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        rv.setAdapter(new InstanceAdapter(items));
+        center.addView(rv, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    private final class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.VH> {
+        private final List<InstanceItem> items;
+        InstanceAdapter(List<InstanceItem> items) { this.items = items; }
+
+        final class VH extends RecyclerView.ViewHolder {
+            final TextView name, ver, more;
+            VH(View v, TextView name, TextView ver, TextView more) { super(v); this.name = name; this.ver = ver; this.more = more; }
+        }
+
+        @NonNull @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            Context c = parent.getContext();
+            LinearLayout card = new LinearLayout(c);
+            card.setGravity(Gravity.CENTER_VERTICAL);
+            card.setPadding(dp(10), dp(6), dp(2), dp(6));
+            card.setClickable(true);
+            RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(dp(3), dp(3), dp(3), dp(3));
+            card.setLayoutParams(lp);
+            LinearLayout texts = new LinearLayout(c);
+            texts.setOrientation(LinearLayout.VERTICAL);
+            TextView name = text("", 13, WHITE, true);
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            TextView ver = text("", 11, MUTED, false);
+            ver.setSingleLine(true);
+            texts.addView(name);
+            texts.addView(ver);
+            card.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            TextView more = text("\u22EE", 20, WHITE, false);
+            more.setGravity(Gravity.CENTER);
+            more.setClickable(true);
+            more.setContentDescription("Instance actions");
+            card.addView(more, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            return new VH(card, name, ver, more);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int position) {
+            final InstanceItem it = items.get(position);
+            Context c = h.itemView.getContext();
+            h.name.setText(it.name);
+            h.ver.setText(it.version);
+            h.itemView.setBackground(RkbUi.ripple(c, RkbUi.rounded(c, it.selected ? 0xFF0B2236 : RkbUi.CARD, 12,
+                    it.selected ? RkbUi.BLUE : RkbUi.BORDER, it.selected ? 2 : 1)));
+            h.itemView.setOnClickListener(v -> selectInstance(it.key));
+            h.more.setOnClickListener(v -> showItemMenu(v, it));
+        }
+
+        @Override public int getItemCount() { return items.size(); }
+    }
+
+    /** Selection = the same preference the launch flow reads, so Launch always starts the selected instance. */
+    private void selectInstance(String key) {
+        LauncherPreferences.DEFAULT_PREF.edit()
+                .putString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, key).commit();
+        if (isAdded()) buildUi();
+    }
+
+    private void showItemMenu(View anchor, final InstanceItem it) {
+        android.widget.PopupMenu pm = new android.widget.PopupMenu(requireContext(), anchor);
+        pm.getMenu().add(0, 1, 0, "Select");
+        pm.getMenu().add(0, 2, 1, "Edit");
+        pm.getMenu().add(0, 3, 2, "Delete");
+        pm.setOnMenuItemClickListener(m -> {
+            if (m.getItemId() == 1) selectInstance(it.key);
+            else if (m.getItemId() == 2) editInstance(it.key);
+            else confirmDeleteInstance(it.key, it.name);
+            return true;
+        });
+        pm.show();
+    }
+
+    /** The Pojav editor edits the CURRENT profile, so select the target first, then open it. */
+    private void editInstance(String key) {
+        LauncherPreferences.DEFAULT_PREF.edit()
+                .putString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, key).commit();
+        editCurrentInstance();
     }
 
     // =============================================================
@@ -318,7 +442,7 @@ public class RkbHomeFragment extends Fragment {
                 accent,
                 new LinearLayout.LayoutParams(
                         dp(4),
-                        dp(52)
+                        dp(cardH() - 16)
                 )
         );
 
@@ -424,7 +548,7 @@ public class RkbHomeFragment extends Fragment {
                 instance,
                 new LinearLayout.LayoutParams(
                         0,
-                        dp(82),
+                        dp(cardH()),
                         1.2f
                 )
         );
@@ -470,7 +594,7 @@ public class RkbHomeFragment extends Fragment {
                 newInstance,
                 new LinearLayout.LayoutParams(
                         0,
-                        dp(82),
+                        dp(cardH()),
                         1f
                 )
         );
@@ -495,10 +619,10 @@ public class RkbHomeFragment extends Fragment {
 
         account.setGravity(Gravity.CENTER_VERTICAL);
         account.setPadding(
-                dp(14),
+                dp(12),
+                dp(5),
                 dp(8),
-                dp(10),
-                dp(8)
+                dp(5)
         );
 
         account.setBackgroundResource(
@@ -525,8 +649,8 @@ public class RkbHomeFragment extends Fragment {
         account.addView(
                 avatar,
                 new LinearLayout.LayoutParams(
-                        dp(46),
-                        dp(46)
+                        dp(RkbUi.isShort(requireContext()) ? 38 : 44),
+                        dp(RkbUi.isShort(requireContext()) ? 38 : 44)
                 )
         );
 
@@ -588,7 +712,7 @@ public class RkbHomeFragment extends Fragment {
                 account,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(70)
+                        dp(RkbUi.isShort(requireContext()) ? 54 : 62)
                 )
         );
     }
@@ -845,6 +969,12 @@ public class RkbHomeFragment extends Fragment {
         return centreDp < 420f ? 84 : 118;
     }
 
+    /** Compact card heights: phones in landscape get small cards, tablets keep a bit more room. */
+    private int cardH() {
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        return dm.heightPixels / dm.density < 440f ? 54 : 64;
+    }
+
     private void loadInstance() {
         try {
             LauncherProfiles.load();
@@ -926,27 +1056,34 @@ public class RkbHomeFragment extends Fragment {
     }
 
     private void confirmDeleteInstance() {
-        if (!isAdded()) return;
+        String key = LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
+        confirmDeleteInstance(key, instName);
+    }
+
+    private void confirmDeleteInstance(final String key, String name) {
+        if (!isAdded() || key == null) return;
         if (instCount < 2) {
             Toast.makeText(requireContext(), "You need at least one instance", Toast.LENGTH_SHORT).show();
             return;
         }
         new android.app.AlertDialog.Builder(requireContext())
-                .setTitle("Delete " + instName + "?")
+                .setTitle("Delete " + name + "?")
                 .setMessage("This removes the instance from the launcher. Its world and mod files on disk are not deleted.")
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton("Delete", (d, w) -> {
                     try {
                         LauncherProfiles.load();
-                        String key = LauncherPreferences.DEFAULT_PREF.getString(
-                                LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
                         Map<String, MinecraftProfile> map = LauncherProfiles.mainProfileJson.profiles;
-                        if (key == null || !map.containsKey(key) || map.size() < 2) return;
+                        if (!map.containsKey(key) || map.size() < 2) return;
                         ProfileIconCache.dropIcon(key);
                         map.remove(key);
                         LauncherProfiles.write();
-                        LauncherPreferences.DEFAULT_PREF.edit().putString(
-                                LauncherPreferences.PREF_KEY_CURRENT_PROFILE, map.keySet().iterator().next()).commit();
+                        String cur = LauncherPreferences.DEFAULT_PREF.getString(
+                                LauncherPreferences.PREF_KEY_CURRENT_PROFILE, null);
+                        if (key.equals(cur) || !map.containsKey(cur)) {
+                            LauncherPreferences.DEFAULT_PREF.edit().putString(
+                                    LauncherPreferences.PREF_KEY_CURRENT_PROFILE, map.keySet().iterator().next()).commit();
+                        }
                     } catch (Exception e) {
                         Toast.makeText(requireContext(), "Delete failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     }

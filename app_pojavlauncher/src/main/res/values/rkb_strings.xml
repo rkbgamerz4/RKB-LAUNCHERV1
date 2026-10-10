@@ -13,4 +13,27 @@
     <string name="rkb_auth_ms_card">Microsoft account\nPremium \u00B7 full online play</string>
     <string name="rkb_auth_local_card">Local profile\nOffline \u00B7 pick any name, no password</string>
     <string name="rkb_auth_note">Credentials go straight to the provider \u2014 the launcher never sees your password.</string>
+    <string name="rkb_pref_voice_title">Voice</string>
+    <string name="rkb_pref_voice_desc">Microphone permission, input language and microphone test</string>
+    <string name="rkb_voice_category">Voice input</string>
+    <string name="rkb_voice_enable_title">Voice input</string>
+    <string name="rkb_voice_enable_summary">Allow the launcher to use the microphone for the tests below. Off = the microphone is never opened.</string>
+    <string name="rkb_voice_perm_title">Microphone permission</string>
+    <string name="rkb_voice_lang_title">Voice input language</string>
+    <string name="rkb_voice_test_mic_title">Test microphone</string>
+    <string name="rkb_voice_test_mic_summary">Shows the live input level for a few seconds</string>
+    <string name="rkb_voice_test_rec_title">Test speech recognition</string>
+    <string name="rkb_voice_test_rec_summary">Uses the Android speech service in the selected language</string>
+    <string name="rkb_voice_chat_title">In-game voice chat</string>
+    <string name="rkb_voice_chat_summary">Not available: this launcher has no voice-chat feature yet, so this only prepares and tests the microphone.</string>
+    <string-array name="rkb_voice_lang_entries">
+        <item>System default</item>
+        <item>English</item>
+        <item>Bangla (Bengali)</item>
+    </string-array>
+    <string-array name="rkb_voice_lang_values">
+        <item>system</item>
+        <item>en-US</item>
+        <item>bn-BD</item>
+    </string-array>
 </resources>

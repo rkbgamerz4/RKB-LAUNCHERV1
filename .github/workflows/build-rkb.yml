@@ -58,6 +58,24 @@ jobs:
           branch: buildjre17-21
           name: jre21-pojav
 
+      - name: Verify bundled Java runtimes
+        # The three downloads above are allowed to fail so the job continues, but an APK built
+        # without them cannot run Minecraft. Say so loudly instead of shipping a silent runtime-less APK.
+        run: |
+          missing=0
+          for d in jre jre-new jre-21; do
+            p=app_pojavlauncher/src/main/assets/components/$d
+            if [ -f "$p/version" ] && [ -f "$p/universal.tar.xz" ]; then
+              echo "OK      $d  (version $(cat $p/version))"
+            else
+              echo "::error::Java runtime '$d' is missing in the APK assets ($p). The upstream artifact download failed or expired."
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "::warning::Building anyway; the app will only run Java versions installed from a .tar.xz in Settings > Java."
+          fi
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 

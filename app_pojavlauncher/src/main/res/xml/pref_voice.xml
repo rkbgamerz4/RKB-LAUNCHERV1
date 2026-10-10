@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <net.kdt.pojavlaunch.prefs.BackButtonPreference/>
+
+    <PreferenceCategory android:title="@string/rkb_voice_category">
+
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="voice_input_enabled"
+            android:summary="@string/rkb_voice_enable_summary"
+            android:title="@string/rkb_voice_enable_title" />
+
+        <Preference
+            android:key="voice_mic_permission"
+            android:persistent="false"
+            android:title="@string/rkb_voice_perm_title" />
+
+        <ListPreference
+            android:defaultValue="system"
+            android:entries="@array/rkb_voice_lang_entries"
+            android:entryValues="@array/rkb_voice_lang_values"
+            android:key="voice_input_language"
+            android:title="@string/rkb_voice_lang_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <Preference
+            android:key="voice_mic_test"
+            android:persistent="false"
+            android:summary="@string/rkb_voice_test_mic_summary"
+            android:title="@string/rkb_voice_test_mic_title" />
+
+        <Preference
+            android:key="voice_recognition_test"
+            android:persistent="false"
+            android:summary="@string/rkb_voice_test_rec_summary"
+            android:title="@string/rkb_voice_test_rec_title" />
+
+        <Preference
+            android:key="voice_chat_info"
+            android:persistent="false"
+            android:selectable="false"
+            android:summary="@string/rkb_voice_chat_summary"
+            android:title="@string/rkb_voice_chat_title" />
+    </PreferenceCategory>
+</PreferenceScreen>
