@@ -26,6 +26,16 @@ import androidx.fragment.app.FragmentManager;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
+import com.kdt.mcgui.ProgressLayout;
+import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
+import net.kdt.pojavlaunch.multirt.MultiRTUtils;
+import net.kdt.pojavlaunch.progresskeeper.ProgressListener;
+import android.os.Handler;
+import android.os.Looper;
+import java.io.File;
+import java.io.PrintWriter;
+import java.io.FileWriter;
+import java.util.Date;
 import net.kdt.pojavlaunch.authenticator.microsoft.MicrosoftBackgroundLogin;
 import net.kdt.pojavlaunch.value.MinecraftAccount;
 import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
@@ -66,6 +76,27 @@ public class LauncherActivity extends AppCompatActivity {
     private boolean mLaunching;          // blocks accidental double launches
     private final ExecutorService mIo = Executors.newSingleThreadExecutor();
     private boolean mLoginRunning;
+    private final Handler mMain = new Handler(Looper.getMainLooper());
+    private ProgressBar mLaunchBar;
+    private volatile String mLastProgressText = "";
+    private static final long START_WATCHDOG_MS = 25000;
+
+    /** Mirrors the real download/prepare progress (the stock progress bar view does not exist in this UI). */
+    private final ProgressListener mDownloadProgressListener = new ProgressListener() {
+        @Override public void onProgressStarted() { }
+        @Override public void onProgressUpdated(int progress, int resid, Object... va) {
+            String text;
+            try {
+                text = resid > 0 ? getString(resid, va) : "Preparing...";
+            } catch (Exception e) {
+                text = "Preparing...";
+            }
+            final String t = text;
+            final int p = progress;
+            runOnUiThread(() -> showLaunchProgress(t, p));
+        }
+        @Override public void onProgressEnded() { }
+    };
     private LinearLayout mLaunchOverlay;
     private TextView mLaunchOverlayText;
 
@@ -254,22 +285,110 @@ public class LauncherActivity extends AppCompatActivity {
             return;
         }
 
-        final String versionId = AsyncMinecraftDownloader.normalizeVersionId(profile.lastVersionId);
+        final String rawVersion = profile.lastVersionId;
+        final String profileName = profile.name;
+        setLaunching(true, "Preparing Minecraft " + rawVersion + "...");
+        // A Fabric/Quilt/Forge profile only references its parent Minecraft version ("inheritsFrom").
+        // The parent is found through the Mojang version list, so make sure the list is loaded first.
+        ensureVersionList(() -> beginDownload(rawVersion, profileName));
+    }
+
+    private void ensureVersionList(final Runnable next) {
+        if (ExtraCore.getValue(ExtraConstants.RELEASE_TABLE) != null) { next.run(); return; }
+        showLaunchProgress("Loading version list...", -1);
+        new AsyncVersionList().getVersionList(versions -> {
+            if (versions != null) ExtraCore.setValue(ExtraConstants.RELEASE_TABLE, versions);
+            // if it stays null (offline, no cache) the downloader still works for fully installed versions
+            runOnUiThread(() -> { if (!isFinishing() && !isDestroyed() && mLaunching) next.run(); });
+        }, false);
+    }
+
+    private void beginDownload(final String rawVersion, final String profileName) {
+        final String versionId = AsyncMinecraftDownloader.normalizeVersionId(rawVersion);
         JMinecraftVersionList.Version listed = AsyncMinecraftDownloader.getListedVersion(versionId);
-        setLaunching(true, "Preparing Minecraft " + versionId + "...");
+        ProgressKeeper.addListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
         final ContextAwareDoneListener inner = new ContextAwareDoneListener(this, versionId);
         try {
             new MinecraftDownloader().start(this, listed, versionId, new DoneListener() {
-                @Override public void onDownloadDone() { inner.onDownloadDone(); }
+                @Override public void onDownloadDone() {
+                    // Files are ready, but the game is NOT running yet: it starts when MainActivity starts.
+                    runOnUiThread(() -> {
+                        ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+                        showLaunchProgress("Starting Minecraft...", -1);
+                        mMain.postDelayed(() -> startWatchdogFired(), START_WATCHDOG_MS);
+                    });
+                    inner.onDownloadDone();
+                }
                 @Override public void onDownloadFailed(Throwable t) {
-                    runOnUiThread(() -> setLaunching(false, null)); // restore the UI after a failure
-                    inner.onDownloadFailed(t);
+                    runOnUiThread(() -> {
+                        ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+                        setLaunching(false, null); // never leave an endless spinner behind
+                    });
+                    writeLaunchDiagnostics(versionId, profileName, t);
+                    inner.onDownloadFailed(t); // shows the real exception to the user
                 }
             });
         } catch (RuntimeException e) {
+            ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
             setLaunching(false, null);
+            writeLaunchDiagnostics(versionId, profileName, e);
             Tools.showError(this, e);
         }
+    }
+
+    /** Still on the launcher long after the files were ready: the game did not start, say so. */
+    private void startWatchdogFired() {
+        if (!mLaunching || isFinishing() || isDestroyed()) return;
+        setLaunching(false, null);
+        Toast.makeText(this, "Minecraft did not start. If a \"download finished\" notification appeared, tap it, "
+                + "or try again. Details: " + diagnosticsFile().getName(), Toast.LENGTH_LONG).show();
+        writeLaunchDiagnostics("(start watchdog)", "", new IllegalStateException(
+                "Files were prepared but MainActivity was not started within " + (START_WATCHDOG_MS / 1000) + "s"));
+    }
+
+    private void showLaunchProgress(String text, int percent) {
+        if (mLaunchOverlay == null || !mLaunching) return;
+        mLastProgressText = text;
+        mLaunchOverlayText.setText(percent >= 0 ? text + "  (" + percent + "%)" : text);
+        if (mLaunchBar != null) {
+            if (percent >= 0) { mLaunchBar.setIndeterminate(false); mLaunchBar.setMax(100); mLaunchBar.setProgress(percent); }
+            else mLaunchBar.setIndeterminate(true);
+        }
+    }
+
+    private File diagnosticsFile() {
+        File dir = getExternalFilesDir(null);
+        return new File(dir != null ? dir : getFilesDir(), "rkb_launch_error.txt");
+    }
+
+    /** Saves what failed (no tokens, no passwords) so it can be shared; the original exception is kept in full. */
+    private void writeLaunchDiagnostics(final String versionId, final String profileName, final Throwable t) {
+        android.util.Log.e("RKB-Launch", "Launch failed for " + versionId, t);
+        try {
+            mIo.execute(() -> {
+                try (PrintWriter w = new PrintWriter(new FileWriter(diagnosticsFile(), true))) {
+                    w.println("==== " + new Date() + " ====");
+                    w.println("Launcher: " + BuildConfig.VERSION_NAME);
+                    w.println("Device: " + Build.MANUFACTURER + " " + Build.MODEL + ", Android " + Build.VERSION.RELEASE
+                            + " (API " + Build.VERSION.SDK_INT + "), ABI " + Build.SUPPORTED_ABIS[0]);
+                    w.println("Version id: " + versionId + "   Instance: " + profileName);
+                    MinecraftAccount acc = RkbUi.currentAccount(this);
+                    w.println("Account type: " + (acc == null ? "none" : acc.isMicrosoft ? "microsoft" : "local"));
+                    try {
+                        StringBuilder rts = new StringBuilder();
+                        for (net.kdt.pojavlaunch.multirt.Runtime r : MultiRTUtils.getRuntimes()) {
+                            rts.append(r.name).append(" (Java ").append(r.javaVersion).append("); ");
+                        }
+                        w.println("Installed runtimes: " + (rts.length() == 0 ? "none" : rts));
+                    } catch (Exception e) { w.println("Installed runtimes: unreadable (" + e + ")"); }
+                    w.println("Last progress: " + mLastProgressText);
+                    t.printStackTrace(w);
+                    w.println();
+                } catch (Exception e) {
+                    android.util.Log.e("RKB-Launch", "could not write diagnostics", e);
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) { }
     }
 
     // ------------------------------------------------------------------ accounts
@@ -371,6 +490,7 @@ public class LauncherActivity extends AppCompatActivity {
             mLaunchOverlay.bringToFront();
         } else {
             mLaunchOverlay.setVisibility(android.view.View.GONE);
+            mMain.removeCallbacksAndMessages(null);
         }
     }
 
@@ -385,6 +505,7 @@ public class LauncherActivity extends AppCompatActivity {
         mLaunchOverlay.setBackground(RkbUi.rounded(this, RkbUi.CARD, 14, RkbUi.BLUE, 1));
         ProgressBar bar = new ProgressBar(this);
         bar.setIndeterminate(true);
+        mLaunchBar = bar;
         mLaunchOverlay.addView(bar, new LinearLayout.LayoutParams(RkbUi.dp(this, 28), RkbUi.dp(this, 28)));
         mLaunchOverlayText = RkbUi.text(this, "", 13, RkbUi.WHITE, true);
         mLaunchOverlayText.setPadding(RkbUi.dp(this, 10), 0, 0, 0);
@@ -458,6 +579,22 @@ public class LauncherActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ lifecycle
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // ROOT CAUSE of "Preparing Minecraft..." never ending: ContextAwareDoneListener starts the game
+        // through ContextExecutor, which needs the foreground Activity. The stock launcher registers it
+        // here; this launcher did not, so after the download only a "download finished" notification
+        // was posted and MainActivity was never started.
+        ContextExecutor.setActivity(this);
+    }
+
+    @Override
+    protected void onPause() {
+        ContextExecutor.clearActivity();
+        super.onPause();
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
@@ -470,6 +607,8 @@ public class LauncherActivity extends AppCompatActivity {
         ExtraCore.removeExtraListenerFromValue(ExtraConstants.MOJANG_LOGIN_TODO, mLocalLoginListener);
         ExtraCore.removeExtraListenerFromValue(ExtraConstants.MICROSOFT_LOGIN_TODO, mMicrosoftLoginListener);
         mIo.shutdown();
+        mMain.removeCallbacksAndMessages(null);
+        ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
         if (mProgressServiceKeeper != null) ProgressKeeper.removeTaskCountListener(mProgressServiceKeeper);
         super.onDestroy();
     }

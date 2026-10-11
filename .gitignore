@@ -11,3 +11,6 @@ app_pojavlauncher/.cxx/
 /curseforge_key.txt
 /app_pojavlauncher/libs/ltw-release.aar
 app_pojavlauncher/upload.jks
+
+# Android file-manager trash files
+.trash-*
