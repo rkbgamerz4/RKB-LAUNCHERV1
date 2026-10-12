@@ -64,30 +64,138 @@ public class DownloadUtils {
         }
     }
 
+    private static final int MONITORED_MAX_ATTEMPTS = 3;
+    private static final int MAX_REDIRECTS = 5;
+
+    /** Non-2xx answer from a server. Kept as its own type so callers/logs can see the real status. */
+    public static class HttpStatusException extends IOException {
+        public final int statusCode;
+        public HttpStatusException(int statusCode, String url, String message) {
+            super("Server returned HTTP " + statusCode + (message != null ? " (" + message + ")" : "") + " for " + url);
+            this.statusCode = statusCode;
+        }
+        /** 5xx, 408 and 429 usually go away on their own; other 4xx never will. */
+        public boolean isTransient() {
+            return statusCode >= 500 || statusCode == 408 || statusCode == 429;
+        }
+    }
+
+    /**
+     * Download a file with progress reporting.
+     *
+     * Compared to the old version this:
+     *  - checks the HTTP status (a 404 still throws FileNotFoundException so mirrors can fall back),
+     *  - follows redirects itself, including http->https ones that HttpURLConnection refuses to follow
+     *    (the redirect body used to be saved as the "file", which then failed SHA-1 verification),
+     *  - writes to "<name>.part" and only moves it into place when complete, so an interrupted
+     *    download never leaves a truncated file under the real name,
+     *  - verifies the received size against Content-Length,
+     *  - retries transient failures (timeouts, resets, 5xx/429) with a short back-off,
+     *  - always closes the connection and removes the partial file.
+     */
     public static void downloadFileMonitored(String urlInput, File outputFile, @Nullable byte[] buffer,
                                              Tools.DownloaderFeedback monitor) throws IOException {
         FileUtils.ensureParentDirectory(outputFile);
+        File partFile = new File(outputFile.getPath() + ".part");
+        if (buffer == null) buffer = new byte[65535];
 
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlInput).openConnection();
-        conn.setConnectTimeout(TIME_OUT);
-        conn.setReadTimeout(TIME_OUT);
-        InputStream readStr = conn.getInputStream();
-        try (FileOutputStream fos = new FileOutputStream(outputFile)) {
-            int current;
-            int overall = 0;
-            int length = conn.getContentLength();
-
-            if (buffer == null) buffer = new byte[65535];
-
-            while ((current = readStr.read(buffer)) != -1) {
-                overall += current;
-                fos.write(buffer, 0, current);
-                monitor.updateProgress(overall, length);
+        IOException lastError = null;
+        for (int attempt = 1; attempt <= MONITORED_MAX_ATTEMPTS; attempt++) {
+            try {
+                downloadOnce(urlInput, outputFile, partFile, buffer, monitor);
+                return;
+            } catch (FileNotFoundException e) {
+                partFile.delete();
+                throw e; // 404/410: not transient, DownloadMirror relies on this type for its fallback
+            } catch (IOException e) {
+                partFile.delete();
+                lastError = e;
+                boolean retry = isTransientFailure(e) && attempt < MONITORED_MAX_ATTEMPTS
+                        && !Thread.currentThread().isInterrupted();
+                Log.w("DownloadUtils", "Download attempt " + attempt + "/" + MONITORED_MAX_ATTEMPTS
+                        + " failed for " + urlInput + ": " + e + (retry ? " - retrying" : ""));
+                if (!retry) break;
+                try {
+                    Thread.sleep(400L * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
-            conn.disconnect();
-        } catch (IOException e) {
-            throw new IOException("Unable to download from " + urlInput, e);
         }
+        throw new IOException("Unable to download from " + urlInput + " : "
+                + (lastError != null ? lastError.getMessage() : "unknown error"), lastError);
+    }
+
+    private static boolean isTransientFailure(IOException e) {
+        if (e instanceof HttpStatusException) return ((HttpStatusException) e).isTransient();
+        if (e instanceof javax.net.ssl.SSLException && !(e instanceof javax.net.ssl.SSLHandshakeException)) return true; // reset mid-stream
+        if (e instanceof javax.net.ssl.SSLHandshakeException) return false; // certificate/protocol problem, will not fix itself
+        return true; // timeouts, resets, truncated streams, DNS hiccups
+    }
+
+    private static void downloadOnce(String urlInput, File outputFile, File partFile, byte[] buffer,
+                                     Tools.DownloaderFeedback monitor) throws IOException {
+        HttpURLConnection conn = openFollowingRedirects(urlInput);
+        try {
+            long length = conn.getContentLengthLong();
+            long overall = 0;
+            try (InputStream in = conn.getInputStream(); FileOutputStream fos = new FileOutputStream(partFile)) {
+                int current;
+                while ((current = in.read(buffer)) != -1) {
+                    overall += current;
+                    fos.write(buffer, 0, current);
+                    monitor.updateProgress((int) overall, (int) length);
+                }
+            }
+            if (length >= 0 && overall != length) {
+                throw new IOException("Truncated download: received " + overall + " of " + length + " bytes");
+            }
+            if (outputFile.exists() && !outputFile.delete()) {
+                throw new IOException("Cannot replace the existing file " + outputFile);
+            }
+            if (!partFile.renameTo(outputFile)) {
+                throw new IOException("Cannot move the downloaded file to " + outputFile);
+            }
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private static HttpURLConnection openFollowingRedirects(String urlInput) throws IOException {
+        URL url = new URL(urlInput);
+        for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+            // Plain-http links are refused by Android's cleartext policy on newer targets; every host
+            // this launcher talks to serves https as well.
+            if ("http".equalsIgnoreCase(url.getProtocol())) url = new URL("https" + url.toString().substring(4));
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            conn.setRequestProperty("Accept-Encoding", "identity"); // keep Content-Length trustworthy
+            conn.setConnectTimeout(TIME_OUT);
+            conn.setReadTimeout(TIME_OUT);
+            conn.setInstanceFollowRedirects(false);
+            int code = conn.getResponseCode();
+            if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                String location = conn.getHeaderField("Location");
+                conn.disconnect();
+                if (location == null || location.isEmpty()) {
+                    throw new IOException("Redirect (HTTP " + code + ") without a Location from " + url);
+                }
+                url = new URL(url, location);
+                continue;
+            }
+            if (code == 404 || code == 410) {
+                conn.disconnect();
+                throw new FileNotFoundException("HTTP " + code + " for " + url);
+            }
+            if (code != HttpURLConnection.HTTP_OK) {
+                String msg = conn.getResponseMessage();
+                conn.disconnect();
+                throw new HttpStatusException(code, url.toString(), msg);
+            }
+            return conn;
+        }
+        throw new IOException("Too many redirects for " + urlInput);
     }
 
     public static <T> T downloadStringCached(String url, String cacheName, ParseCallback<T> parseCallback) throws IOException, ParseException{
@@ -151,12 +259,31 @@ public class DownloadUtils {
         int attempts = 0;
         boolean fileOkay = verifyFile(outputFile, sha1);
         T result = null;
+        String previousBadHash = null;
         while (attempts < 5 && !fileOkay){
             attempts++;
             downloadFile(downloadFunction);
             fileOkay = verifyFile(outputFile, sha1);
+            if (!fileOkay) {
+                String actual = Tools.getSHA1(outputFile);
+                Log.w("DownloadUtils", "SHA1 mismatch for " + outputFile.getName() + " (attempt " + attempts
+                        + "): expected " + sha1 + " got " + actual);
+                // The same wrong content twice in a row is not a network glitch: the server (or mirror)
+                // is serving something different from what the metadata describes. Stop early.
+                if (actual != null && actual.equals(previousBadHash)) {
+                    outputFile.delete();
+                    throw new SHA1VerificationException("SHA1 verification failed for " + outputFile.getName()
+                            + ": the server keeps returning a file with hash " + actual + " instead of " + sha1
+                            + " (outdated/tampered mirror or wrong metadata)");
+                }
+                previousBadHash = actual;
+            }
         }
-        if(!fileOkay) throw new SHA1VerificationException("SHA1 verifcation failed after 5 download attempts");
+        if(!fileOkay) {
+            outputFile.delete(); // never leave a file that failed verification behind
+            throw new SHA1VerificationException("SHA1 verification failed for " + outputFile.getName()
+                    + " after " + attempts + " download attempts");
+        }
         return result;
     }
 

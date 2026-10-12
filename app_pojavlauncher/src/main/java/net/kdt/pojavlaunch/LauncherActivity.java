@@ -26,6 +26,8 @@ import androidx.fragment.app.FragmentManager;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
+import net.kdt.pojavlaunch.tasks.LocalAccountDownloadException;
+import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import com.kdt.mcgui.ProgressLayout;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
 import net.kdt.pojavlaunch.multirt.MultiRTUtils;
@@ -307,13 +309,14 @@ public class LauncherActivity extends AppCompatActivity {
         final String versionId = AsyncMinecraftDownloader.normalizeVersionId(rawVersion);
         JMinecraftVersionList.Version listed = AsyncMinecraftDownloader.getListedVersion(versionId);
         ProgressKeeper.addListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+        ProgressKeeper.addListener(ProgressLayout.UNPACK_RUNTIME, mDownloadProgressListener); // Java runtime download
         final ContextAwareDoneListener inner = new ContextAwareDoneListener(this, versionId);
         try {
             new MinecraftDownloader().start(this, listed, versionId, new DoneListener() {
                 @Override public void onDownloadDone() {
                     // Files are ready, but the game is NOT running yet: it starts when MainActivity starts.
                     runOnUiThread(() -> {
-                        ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+                        removeProgressListeners();
                         showLaunchProgress("Starting Minecraft...", -1);
                         mMain.postDelayed(() -> startWatchdogFired(), START_WATCHDOG_MS);
                     });
@@ -321,19 +324,52 @@ public class LauncherActivity extends AppCompatActivity {
                 }
                 @Override public void onDownloadFailed(Throwable t) {
                     runOnUiThread(() -> {
-                        ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+                        removeProgressListeners();
                         setLaunching(false, null); // never leave an endless spinner behind
                     });
                     writeLaunchDiagnostics(versionId, profileName, t);
-                    inner.onDownloadFailed(t); // shows the real exception to the user
+                    final LocalAccountDownloadException local = findCause(t, LocalAccountDownloadException.class);
+                    if (local != null) {
+                        runOnUiThread(() -> showMicrosoftNeededDialog(versionId, local));
+                    } else {
+                        inner.onDownloadFailed(t); // shows the real exception (with its cause) to the user
+                    }
                 }
             });
         } catch (RuntimeException e) {
-            ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+            removeProgressListeners();
             setLaunching(false, null);
             writeLaunchDiagnostics(versionId, profileName, e);
             Tools.showError(this, e);
         }
+    }
+
+    private void removeProgressListeners() {
+        ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+        ProgressKeeper.removeListener(ProgressLayout.UNPACK_RUNTIME, mDownloadProgressListener);
+    }
+
+    private static <T extends Throwable> T findCause(Throwable t, Class<T> type) {
+        for (int depth = 0; t != null && depth < 10; depth++, t = t.getCause()) {
+            if (type.isInstance(t)) return type.cast(t);
+        }
+        return null;
+    }
+
+    /** Explains the Local-account rule and offers the real fix (sign in), instead of a raw stack trace. */
+    private void showMicrosoftNeededDialog(String versionId, LocalAccountDownloadException e) {
+        if (isFinishing() || isDestroyed()) return;
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Microsoft account needed")
+                .setMessage("Minecraft " + versionId + " is not fully installed on this device ("
+                        + (e.missingCount > 0 ? e.missingCount + " files missing, e.g. " : "e.g. ") + e.firstFileName + ").\n\n"
+                        + "Local accounts can only play versions that are already downloaded. Downloading Minecraft "
+                        + "requires a Microsoft account that owns the game. Sign in once, press LAUNCH to download, "
+                        + "and the version can be played offline afterwards.")
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("Sign in with Microsoft", (d, w) ->
+                        Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null))
+                .show();
     }
 
     /** Still on the launcher long after the files were ready: the game did not start, say so. */
@@ -608,7 +644,7 @@ public class LauncherActivity extends AppCompatActivity {
         ExtraCore.removeExtraListenerFromValue(ExtraConstants.MICROSOFT_LOGIN_TODO, mMicrosoftLoginListener);
         mIo.shutdown();
         mMain.removeCallbacksAndMessages(null);
-        ProgressKeeper.removeListener(ProgressLayout.DOWNLOAD_MINECRAFT, mDownloadProgressListener);
+        removeProgressListeners();
         if (mProgressServiceKeeper != null) ProgressKeeper.removeTaskCountListener(mProgressServiceKeeper);
         super.onDestroy();
     }

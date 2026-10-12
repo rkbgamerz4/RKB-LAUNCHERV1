@@ -14,6 +14,7 @@ import net.kdt.pojavlaunch.JAssetInfo;
 import net.kdt.pojavlaunch.JAssets;
 import net.kdt.pojavlaunch.JMinecraftVersionList;
 import net.kdt.pojavlaunch.NewJREUtil;
+import net.kdt.pojavlaunch.BuildConfig;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.mirrors.DownloadMirror;
@@ -111,10 +112,27 @@ public class MinecraftDownloader {
             throw new RuntimeException(activity.getString(R.string.exception_failed_to_unpack_jre17));
         }
 
+        if(isLocalProfile) {
+            // Fail fast, before any thread pool or network use, with an exact count instead of
+            // dying on whichever file happens to be reached first.
+            int missing = 0;
+            String firstMissing = null;
+            for(DownloaderTask task : mScheduledDownloadTasks) {
+                if(task.isRequiredAndMissing()) {
+                    if(firstMissing == null) firstMissing = task.mTargetPath.getName();
+                    missing++;
+                }
+            }
+            if(missing > 0) throw new LocalAccountDownloadException(firstMissing, missing);
+        }
+
+        // Downloads are IO/latency bound (thousands of small asset files): a few more parallel streams
+        // than the old fixed 4 shorten installs noticeably, without hammering the CDN.
+        final int downloadThreads = Math.min(8, Math.max(4, Runtime.getRuntime().availableProcessors()));
         ArrayBlockingQueue<Runnable> taskQueue =
                 new ArrayBlockingQueue<>(mScheduledDownloadTasks.size(), false);
         ThreadPoolExecutor downloaderPool =
-                new ThreadPoolExecutor(4, 4, 500, TimeUnit.MILLISECONDS, taskQueue);
+                new ThreadPoolExecutor(downloadThreads, downloadThreads, 500, TimeUnit.MILLISECONDS, taskQueue);
 
         // I have tried pre-filling the queue directly instead of doing this, but it didn't work.
         // What a shame.
@@ -190,6 +208,25 @@ public class MinecraftDownloader {
 
         File targetDirectory = new File(Tools.DIR_CACHE, "natives/"+versionName);
         FileUtils.ensureDirectory(targetDirectory);
+
+        // Skip the extraction when the same native archives were already extracted for this launcher
+        // build: the marker is only written after a fully successful extraction.
+        File marker = new File(targetDirectory, ".rkb-natives-ok");
+        String fingerprint = nativesFingerprint();
+        try {
+            if(marker.isFile() && fingerprint.equals(Tools.read(marker.getAbsolutePath()))) {
+                String[] present = targetDirectory.list();
+                if(present != null && present.length > 1) {
+                    Log.i("MinecraftDownloader", "Natives for " + versionName + " are up to date, skipping extraction");
+                    return;
+                }
+            }
+        }catch (IOException e) {
+            Log.i("MinecraftDownloader", "Cannot read the natives marker, extracting again", e);
+        }
+        //noinspection ResultOfMethodCallIgnored
+        marker.delete(); // invalidate first so an interrupted extraction is never trusted
+
         NativesExtractor nativesExtractor = new NativesExtractor(targetDirectory);
         int extractedCount = 0;
         for(File source : mDeclaredNatives) {
@@ -198,6 +235,21 @@ public class MinecraftDownloader {
             ProgressLayout.setProgress(ProgressLayout.DOWNLOAD_MINECRAFT, extractedCount * 100 / totalCount,
                     R.string.newdl_extracting_native_libraries, extractedCount, totalCount);
         }
+        try {
+            Tools.write(marker.getAbsolutePath(), fingerprint);
+        }catch (IOException e) {
+            Log.w("MinecraftDownloader", "Cannot write the natives marker (extraction will repeat next time)", e);
+        }
+    }
+
+    /** Identifies the exact native archives + the launcher build (built-in libraries decide the blacklist). */
+    private String nativesFingerprint() {
+        java.util.ArrayList<String> parts = new java.util.ArrayList<>();
+        for(File source : mDeclaredNatives) {
+            parts.add(source.getName() + ":" + source.length() + ":" + source.lastModified());
+        }
+        java.util.Collections.sort(parts);
+        return BuildConfig.VERSION_CODE + "|" + Tools.NATIVE_LIB_DIR + "|" + parts;
     }
 
     private File downloadGameJson(JMinecraftVersionList.Version verInfo) throws IOException, MirrorTamperedException {
@@ -517,7 +569,12 @@ public class MinecraftDownloader {
         
         private void downloadFile() throws Exception {
             if(isLocalProfile){
-                throw new RuntimeException("Download failed. Please make sure you are logged in with a Microsoft Account.");
+                // Policy kept: Local accounts cannot download Minecraft files. Optional files are just skipped.
+                if(mSkipIfFailed) {
+                    mProcessedFileCounter.incrementAndGet();
+                    return;
+                }
+                throw new LocalAccountDownloadException(mTargetPath.getName(), 1);
             }
 
             try {
@@ -530,6 +587,11 @@ public class MinecraftDownloader {
                 if(!mSkipIfFailed) throw e;
             }
             mProcessedFileCounter.incrementAndGet();
+        }
+
+        /** Cheap existence check used by the Local-account pre-flight (no hashing). */
+        boolean isRequiredAndMissing() {
+            return !mSkipIfFailed && !mTargetPath.isFile();
         }
 
         private void finishWithoutDownloading() {

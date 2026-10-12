@@ -1046,6 +1046,15 @@ public final class Tools {
     }
 
 
+    /** @return the lowercase hex SHA-1 of the file, or null if it cannot be read (used for diagnostics). */
+    public static String getSHA1(File f) {
+        try (InputStream is = new FileInputStream(f)) {
+            return new String(Hex.encodeHex(org.apache.commons.codec.digest.DigestUtils.sha1(is)));
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
     public static boolean compareSHA1(File f, String sourceSHA) {
         try {
             String sha1_dst;
@@ -1437,6 +1446,19 @@ public final class Tools {
     public static boolean isDemoProfile(Context ctx){
         MinecraftAccount currentProfile = PojavProfile.getCurrentProfileContent(ctx, null);
         return currentProfile != null && currentProfile.isDemo();
+    }
+
+    /** Active network with connectivity (needs ACCESS_NETWORK_STATE, declared in the manifest). */
+    public static boolean isOnline(Context ctx) {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager)
+                    ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return true; // cannot tell: let the real request decide
+            android.net.NetworkInfo info = cm.getActiveNetworkInfo();
+            return info != null && info.isConnected();
+        } catch (Exception e) {
+            return true;
+        }
     }
 
     public static boolean isLocalProfile(Context ctx){

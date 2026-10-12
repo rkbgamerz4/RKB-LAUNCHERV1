@@ -51,6 +51,15 @@ public class MultiRTUtils {
         return runtimes;
     }
 
+    /** Downloadable runtimes whose Java version is not installed yet (and is usable on this device). */
+    public static List<net.kdt.pojavlaunch.NewJREUtil.ExternalRuntime> getRuntimesToDownload() {
+        List<net.kdt.pojavlaunch.NewJREUtil.ExternalRuntime> result = new ArrayList<>();
+        for (net.kdt.pojavlaunch.NewJREUtil.ExternalRuntime r : net.kdt.pojavlaunch.NewJREUtil.ExternalRuntime.values()) {
+            if (r.isSupportedOnThisDevice() && getExactJreName(r.majorVersion) == null) result.add(r);
+        }
+        return result;
+    }
+
     public static String getExactJreName(int majorVersion) {
         List<Runtime> runtimes = getRuntimes();
         for(Runtime r : runtimes)

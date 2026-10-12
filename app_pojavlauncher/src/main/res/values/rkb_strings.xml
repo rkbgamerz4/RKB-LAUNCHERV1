@@ -36,4 +36,11 @@
         <item>en-US</item>
         <item>bn-BD</item>
     </string-array>
+    <string name="newdl_downloading_jre_runtime">Downloading Java %1$s runtime (%2$.1f / %3$.1f MB)</string>
+    <string name="multirt_no_internet">No internet connection. Connect to the internet to download the Java runtime.</string>
+    <string name="rkb_runtime_download">Download</string>
+    <string name="rkb_runtime_downloading">Downloading...</string>
+    <string name="rkb_runtime_not_installed">Not installed - download from the official OpenJDK Android build</string>
+    <string name="rkb_runtime_download_failed">Runtime download failed: %1$s</string>
+    <string name="rkb_runtime_installed_ok">Java %1$s runtime installed</string>
 </resources>
