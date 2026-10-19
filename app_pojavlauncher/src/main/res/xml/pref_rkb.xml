@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app2="http://schemas.android.com/apk/res-auto">
+
+    <net.kdt.pojavlaunch.prefs.BackButtonPreference/>
+
+    <PreferenceCategory android:title="@string/rkb_pref_anim_category">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="rkb_anim_enabled"
+            android:summary="@string/rkb_pref_anim_enabled_desc"
+            android:title="@string/rkb_pref_anim_enabled" />
+
+        <net.kdt.pojavlaunch.prefs.CustomSeekBarPreference
+            android:defaultValue="5"
+            android:key="rkb_anim_amplitude"
+            android:max="10"
+            android:summary="@string/rkb_pref_anim_amplitude_desc"
+            android:title="@string/rkb_pref_anim_amplitude"
+            app2:min="1"
+            app2:seekBarIncrement="1"
+            app2:selectable="false"
+            app2:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="rkb_anim_ambient"
+            android:summary="@string/rkb_pref_anim_ambient_desc"
+            android:title="@string/rkb_pref_anim_ambient" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/rkb_pref_maint_category">
+        <Preference
+            android:key="rkb_runtime_setup"
+            android:persistent="false"
+            android:summary="@string/rkb_pref_runtime_setup_desc"
+            android:title="@string/rkb_pref_runtime_setup" />
+        <Preference
+            android:key="rkb_clear_caches"
+            android:persistent="false"
+            android:summary="@string/rkb_pref_clear_caches_desc"
+            android:title="@string/rkb_pref_clear_caches" />
+        <Preference
+            android:key="rkb_reset_settings"
+            android:persistent="false"
+            android:summary="@string/rkb_pref_reset_desc"
+            android:title="@string/rkb_pref_reset" />
+    </PreferenceCategory>
+</PreferenceScreen>

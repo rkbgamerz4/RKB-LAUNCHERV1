@@ -53,6 +53,14 @@
             android:icon="@drawable/ic_rkb_voice"
             />
 
+        <Preference
+            android:key="rkb_interface_setting"
+            android:title="@string/rkb_pref_rkb_title"
+            android:summary="@string/rkb_pref_rkb_desc"
+            android:fragment="net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceRkbFragment"
+            android:icon="@drawable/ic_rkb_nav_settings"
+            />
+
 
         <Preference
             android:key="experimental_screen_setting"

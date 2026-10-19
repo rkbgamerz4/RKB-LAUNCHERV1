@@ -60,7 +60,8 @@ public class RkbHomeFragment extends Fragment {
     private String instName = "Minecraft";
     private String instVer = "";
     private int instCount = 1;
-    private int mSkinRequest; // invalidates stale skin callbacks
+    private int mSkinRequest;
+    private boolean mAnimateNext; // invalidates stale skin callbacks
 
     @Nullable
     @Override
@@ -72,6 +73,7 @@ public class RkbHomeFragment extends Fragment {
         root = new FrameLayout(requireContext());
         root.setBackgroundColor(BG);
 
+        mAnimateNext = true; // the entrance animation plays once per screen creation, not on every refresh
         buildUi();
 
         return root;
@@ -165,6 +167,14 @@ public class RkbHomeFragment extends Fragment {
 
         buildAccount();
         buildPlayerArea();
+
+        if (mAnimateNext) {
+            mAnimateNext = false;
+            // sidebar from the left, instance list rising in, player panel from the right
+            RkbMotion.slideIn(sideScroll, -14f, 0f, 0, 260);
+            RkbMotion.slideIn(center, 0f, 12f, 40, 300);
+            RkbMotion.slideIn(rightPanel, 18f, 0f, 70, 320);
+        }
     }
 
     // =============================================================
@@ -349,6 +359,7 @@ public class RkbHomeFragment extends Fragment {
             card.setGravity(Gravity.CENTER_VERTICAL);
             card.setPadding(dp(10), dp(6), dp(2), dp(6));
             card.setClickable(true);
+            RkbMotion.press(card);
             RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT);
             lp.setMargins(dp(3), dp(3), dp(3), dp(3));
             card.setLayoutParams(lp);
@@ -434,6 +445,7 @@ public class RkbHomeFragment extends Fragment {
         instance.setBackgroundResource(R.drawable.bg_rkb_instance);
         instance.setClickable(true);
         instance.setOnClickListener(v -> showInstanceChooser());
+        RkbMotion.press(instance);
 
         TextView accent = new TextView(requireContext());
         accent.setBackgroundColor(BLUE);
@@ -562,6 +574,7 @@ public class RkbHomeFragment extends Fragment {
         newInstance.setGravity(Gravity.CENTER);
         newInstance.setClickable(true);
         newInstance.setOnClickListener(v -> openNewInstance());
+        RkbMotion.press(newInstance);
         newInstance.setBackgroundResource(
                 R.drawable.bg_rkb_new_instance
         );
@@ -630,6 +643,7 @@ public class RkbHomeFragment extends Fragment {
         );
         account.setClickable(true);
         account.setOnClickListener(v -> RkbNav.openAccount(requireActivity()));
+        RkbMotion.press(account);
 
         TextView avatar = text(
                 "R",
@@ -804,6 +818,7 @@ public class RkbHomeFragment extends Fragment {
         );
 
         launch.setContentDescription("Launch Minecraft");
+        RkbMotion.press(launch);
         launch.setClickable(true);
         launch.setOnClickListener(
                 v -> launchMinecraft()
@@ -918,6 +933,7 @@ public class RkbHomeFragment extends Fragment {
         holder.setGravity(Gravity.CENTER);
         final RkbSkinView view = new RkbSkinView(requireContext());
         holder.addView(view, new LinearLayout.LayoutParams(-1, -1));
+        RkbMotion.floatIdle(view); // only when "Idle motion" is on in Settings > RKB interface
         // Resolved off the main thread: official profile skin for Microsoft accounts, default otherwise.
         final int request = ++mSkinRequest;
         final MinecraftAccount acc = RkbUi.currentAccount(requireContext());

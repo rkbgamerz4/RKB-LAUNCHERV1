@@ -43,4 +43,22 @@
     <string name="rkb_runtime_not_installed">Not installed - download from the official OpenJDK Android build</string>
     <string name="rkb_runtime_download_failed">Runtime download failed: %1$s</string>
     <string name="rkb_runtime_installed_ok">Java %1$s runtime installed</string>
+    <string name="rkb_pref_rkb_title">RKB interface</string>
+    <string name="rkb_pref_rkb_desc">Animations, Java setup, cache and reset tools</string>
+    <string name="rkb_pref_anim_category">Animations</string>
+    <string name="rkb_pref_anim_enabled">Interface animations</string>
+    <string name="rkb_pref_anim_enabled_desc">Screen fades, card rise-in and button press feedback. Also off when Android\'s animation scale is off.</string>
+    <string name="rkb_pref_anim_amplitude">Animation amplitude</string>
+    <string name="rkb_pref_anim_amplitude_desc">How far and how long things travel (5 = default, 1 = subtle, 10 = strong).</string>
+    <string name="rkb_pref_anim_ambient">Idle motion</string>
+    <string name="rkb_pref_anim_ambient_desc">Let the player skin on Home float gently. Off by default to save battery on low-end phones.</string>
+    <string name="rkb_pref_maint_category">Tools</string>
+    <string name="rkb_pref_runtime_setup">Java runtime setup</string>
+    <string name="rkb_pref_runtime_setup_desc">Choose which Java versions to download (8, 17, 21, 25)</string>
+    <string name="rkb_pref_clear_caches">Clear temporary caches</string>
+    <string name="rkb_pref_clear_caches_desc">Deletes cached downloads and temporary files. Worlds, mods, accounts and instances are not touched.</string>
+    <string name="rkb_pref_reset">Reset launcher settings</string>
+    <string name="rkb_pref_reset_desc">Restores every launcher setting to its default. Accounts, instances and game files are kept.</string>
+    <string name="rkb_pref_optimizer_title">Quick device optimizer</string>
+    <string name="rkb_pref_optimizer_desc">One tap RAM, resolution and performance presets for your phone</string>
 </resources>

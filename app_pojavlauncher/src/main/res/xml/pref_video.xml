@@ -5,6 +5,13 @@
     <net.kdt.pojavlaunch.prefs.BackButtonPreference/>
 
     <PreferenceCategory android:title="@string/preference_category_video" >
+        <Preference
+            android:key="rkb_quick_optimizer"
+            android:persistent="false"
+            android:icon="@drawable/ic_setting_screen_resolution"
+            android:summary="@string/rkb_pref_optimizer_desc"
+            android:title="@string/rkb_pref_optimizer_title" />
+
         <androidx.preference.ListPreference
             android:title="@string/mcl_setting_category_renderer"
             android:key="renderer"

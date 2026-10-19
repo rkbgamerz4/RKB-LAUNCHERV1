@@ -89,6 +89,7 @@ public final class RkbUi {
         b.setClickable(true);
         b.setFocusable(true);
         if (l != null) b.setOnClickListener(l);
+        RkbMotion.press(b);
         return b;
     }
 
@@ -152,6 +153,7 @@ public final class RkbUi {
             item.setContentDescription(d.label);
             item.setClickable(true);
             item.setFocusable(true);
+            RkbMotion.press(item);
             item.setOnClickListener(v -> {
                 Context ctx = v.getContext();
                 while (ctx instanceof android.content.ContextWrapper && !(ctx instanceof Activity)) {
@@ -264,6 +266,7 @@ public final class RkbUi {
         col.addView(titles);
 
         col.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        RkbMotion.revealScreen(titles, content); // title block, then content (no-op if animations are off)
         root.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         return root;
     }

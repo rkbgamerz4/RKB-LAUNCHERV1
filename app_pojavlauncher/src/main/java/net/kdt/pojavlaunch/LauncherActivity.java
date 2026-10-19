@@ -41,6 +41,7 @@ import java.util.Date;
 import net.kdt.pojavlaunch.authenticator.microsoft.MicrosoftBackgroundLogin;
 import net.kdt.pojavlaunch.value.MinecraftAccount;
 import net.kdt.pojavlaunch.rkb.ui.RkbHomeFragment;
+import net.kdt.pojavlaunch.rkb.ui.RkbMotion;
 import net.kdt.pojavlaunch.rkb.ui.RkbSkinFragment;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -174,6 +175,8 @@ public class LauncherActivity extends AppCompatActivity {
         installBackHandler();
 
         if (savedInstanceState == null) {
+            // first-run "Java for Minecraft" picker (shown once, only when a runtime is missing and we are online)
+            mMain.postDelayed(() -> { if (!isFinishing() && !isDestroyed()) net.kdt.pojavlaunch.rkb.ui.RkbRuntimeSetup.maybeShowFirstRun(this); }, 900);
             getSupportFragmentManager().beginTransaction()
                     .setReorderingAllowed(true)
                     .replace(R.id.container_fragment, RkbNav.create(RkbNav.Dest.HOME), RkbNav.Dest.HOME.tag)
@@ -201,17 +204,22 @@ public class LauncherActivity extends AppCompatActivity {
 
         // Drop everything above Home (secondary screens, login flows, ...).
         fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        final boolean animate = RkbMotion.enabled(this);
         if (dest == RkbNav.Dest.HOME) {
             Fragment now = fm.findFragmentById(R.id.container_fragment);
             if (now == null || !RkbNav.Dest.HOME.tag.equals(now.getTag())) {
-                fm.beginTransaction().setReorderingAllowed(true)
+                androidx.fragment.app.FragmentTransaction homeTx = fm.beginTransaction().setReorderingAllowed(true);
+                if (animate) homeTx.setCustomAnimations(R.anim.rkb_fade_in, R.anim.rkb_fade_out);
+                homeTx
                         .replace(R.id.container_fragment, RkbNav.create(dest), dest.tag).commit();
             }
             return;
         }
         Fragment target = RkbNav.create(dest);
-        fm.beginTransaction()
-                .setReorderingAllowed(true)
+        androidx.fragment.app.FragmentTransaction tx = fm.beginTransaction().setReorderingAllowed(true);
+        // cross-fade between screens (reference: ~200 ms), skipped when animations are disabled
+        if (animate) tx.setCustomAnimations(R.anim.rkb_fade_in, R.anim.rkb_fade_out, R.anim.rkb_fade_in, R.anim.rkb_fade_out);
+        tx
                 .replace(R.id.container_fragment, target, dest.tag)
                 .setPrimaryNavigationFragment(target) // lets nested screens (Settings) handle Back first
                 .addToBackStack(dest.tag)
