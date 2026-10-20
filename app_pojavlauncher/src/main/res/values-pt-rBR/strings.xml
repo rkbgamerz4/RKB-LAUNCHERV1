@@ -262,6 +262,7 @@
     <string name="fabric_dl_progress">Baixando metadados do carregador %s</string>
     <string name="fabric_dl_loader_version">Versão do carregador %s</string>
 
+    
     <string name="fabric_dl_install">Instalar</string>
     <string name="fabric_dl_cant_read_meta">Falha ao ler os metadados do carregador %s. Por favor, tente novamente mais tarde.</string>
     <string name="create_profile_vanilla_like_versions">Versões vanilla</string>
@@ -279,10 +280,10 @@
     <string name="search_modpack_no_result">Nenhum modpack encontrado</string>
     <string name="search_modpack_error">Falha ao encontrar modpacks</string>
     <string name="search_modpack_download_error">Falha ao baixar os metadados do modpack</string>
-    <string name="modpack_download_downloading_metadata">Baixando metadados do modpack (%.2f MB /%.2f MB)</string>
-    <string name="modpack_download_downloading_mods">Baixando mods (%.2f MB /%.2f MB)</string>
-    <string name="modpack_download_downloading_mods_fc">Baixando mods (Arquivo %d de %d)</string>
-    <string name="modpack_download_applying_overrides">Aplicando substituições (%d/%d)</string>
+    <string name="modpack_download_downloading_metadata">Baixando metadados do modpack (%1$.2f MB / %2$.2f MB)</string>
+    <string name="modpack_download_downloading_mods">Baixando mods (%1$.2f MB / %2$.2f MB)</string>
+    <string name="modpack_download_downloading_mods_fc">Baixando mods (Arquivo %1$d de %2$d)</string>
+    <string name="modpack_download_applying_overrides">Aplicando substituições (%1$d/%2$d)</string>
     <string name="modpack_install_notification_title">Instalador de Modpack do Pojav</string>
     <string name="modpack_install_notification_success">Clique aqui para finalizar a instalação do modpack</string>
     <string name="modpack_install_notification_data_not_available">Falha ao baixar informações do mod loader</string>
@@ -321,8 +322,8 @@
     <string name="exception_failed_to_unpack_jre17">Falha ao instalar o JRE 17</string>
     <string name="newdl_starting">Lendo metadados do jogo…</string>
     <string name="newdl_downloading_metadata">Baixando metadados do jogo (%s)</string>
-    <string name="newdl_downloading_game_files">Baixando o jogo… (%d/%d, %.2f MB/s)</string>
-    <string name="newdl_downloading_game_files_size">Baixando o jogo… (%.2f/%.2f MB, %.2f MB/s)</string>
+    <string name="newdl_downloading_game_files">Baixando o jogo… (%1$d/%2$d, %3$.2f MB/s)</string>
+    <string name="newdl_downloading_game_files_size">Baixando o jogo… (%1$.2f/%2$.2f MB, %3$.2f MB/s)</string>
     <string name="cropper_title">Selecionar região da imagem</string>
     <string name="cropper_lock_vertical">Bloqueio V.</string>
     <string name="cropper_lock_horizontal">Bloqueio H.</string>
