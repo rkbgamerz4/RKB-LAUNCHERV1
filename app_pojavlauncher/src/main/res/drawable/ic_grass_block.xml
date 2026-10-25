@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Dirt bottom -->
+    <path
+        android:fillColor="#8B6914"
+        android:pathData="M4,10h16v10H4z"/>
+    <!-- Grass top -->
+    <path
+        android:fillColor="#5D9C3F"
+        android:pathData="M4,6h16v5H4z"/>
+    <!-- Grass detail -->
+    <path
+        android:fillColor="#7BC67E"
+        android:pathData="M4,6h16v2H4z"/>
+    <!-- Side shade -->
+    <path
+        android:fillColor="#6B5210"
+        android:pathData="M16,10h4v10h-4z"/>
+</vector>

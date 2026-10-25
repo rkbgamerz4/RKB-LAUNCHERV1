@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <!-- Outer glow circle -->
+    <path
+        android:fillColor="#001A2E"
+        android:pathData="M16,2C8.27,2 2,8.27 2,16s6.27,14 14,14 14,-6.27 14,-14S23.73,2 16,2z"/>
+    <path
+        android:fillColor="#00B4FF"
+        android:pathData="M16,4C9.37,4 4,9.37 4,16s5.37,12 12,12 12,-5.37 12,-12S22.63,4 16,4zM16,6c5.52,0 10,4.48 10,10s-4.48,10 -10,10S6,21.52 6,16 10.48,6 16,6z"/>
+    <!-- Letter R -->
+    <path
+        android:fillColor="#00B4FF"
+        android:pathData="M11,10h5.5c1.93,0 3.5,1.57 3.5,3.5c0,1.32 -0.74,2.47 -1.82,3.06L20,20h-2.5l-1.8,-3H13v3h-2V10zM13,12v3h3.5c0.83,0 1.5,-0.67 1.5,-1.5S17.33,12 16.5,12H13z"/>
+</vector>
