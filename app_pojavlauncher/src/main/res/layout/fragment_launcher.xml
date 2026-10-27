@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -206,6 +205,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
+
+                <com.kdt.mcgui.LauncherMenuButton
+                    android:id="@+id/rkb_hub_button"
+                    style="@style/LauncherMenuButton.Universal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:drawableStart="@drawable/ic_px_gamepad"
+                    android:text="RKB CONTROL CENTER"
+                    android:textColor="#00A8FF" />
 
                 <com.kdt.mcgui.LauncherMenuButton
                     android:id="@+id/custom_control_button"

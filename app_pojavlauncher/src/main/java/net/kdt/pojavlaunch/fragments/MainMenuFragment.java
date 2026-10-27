@@ -51,6 +51,8 @@ public class MainMenuFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         Button mNewsButton = view.findViewById(R.id.news_button);
+        View rkbHubButton = view.findViewById(R.id.rkb_hub_button);
+        rkbHubButton.setOnClickListener(v -> Tools.swapFragment(requireActivity(), net.kdt.pojavlaunch.rkbnew.RkbHubFragment.class, "RkbHubFragment", null));
         Button mDiscordButton = view.findViewById(R.id.social_media_button);
         Button mCustomControlButton = view.findViewById(R.id.custom_control_button);
         Button mInstallJarButton = view.findViewById(R.id.install_jar_button);
