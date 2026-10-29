@@ -28,6 +28,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
+import com.movtery.zalithlauncher.ui.screens.content.RkbInstancesScreen
 import com.movtery.zalithlauncher.ui.screens.content.RkbSettingsHub
 import com.movtery.zalithlauncher.ui.screens.content.RkbHomeScreen
 import androidx.compose.foundation.layout.Arrangement
@@ -591,11 +592,10 @@ private fun NavigationUI(
                     )
                 }
                 entry<NormalNavKey.VersionsManager> {
-                    VersionsManageScreen(
+                    RkbInstancesScreen(
                         backScreenViewModel = screenBackStackModel,
                         navigateToVersions = navigateToVersions,
                         navigateToExport = navigateToExport,
-                        eventViewModel = eventViewModel,
                         submitError = submitError
                     )
                 }

@@ -35,3 +35,6 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - Header chip now shows the account skin head (`PlayerFace`) plus a wallpaper button (`rememberWallpaperPicker`).
 - About credit string corrected ("Author of Zalith Launcher 2, the base of RKB LAUNCHER").
 - `libdiscord_partner_sdk.so` NOT added (no JNI/Java bindings, needs Discord app id; see chat).
+
+## Batch 4 (still uncompiled)
+- Instances: `RkbInstancesScreen.kt` replaces the Zalith list layout (search, sort, loader filter, New, empty state). Still uses Zalith's `VersionItemLayout` + rename/copy/export/delete dialogs. Not present any more: game-folder switcher and "clean up game files" buttons (old `VersionsManageScreen.kt` is kept in the tree, unused).
