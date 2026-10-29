@@ -28,13 +28,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** Returns a function that opens the image picker and stores the chosen image as the Home wallpaper. */
 @Composable
-fun RkbWallpaperCard(modifier: Modifier = Modifier) {
+fun rememberWallpaperPicker(): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val current = AllSettings.homeWallpaper.state
-
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
                 runCatching {
@@ -47,6 +47,13 @@ fun RkbWallpaperCard(modifier: Modifier = Modifier) {
             }
         }
     }
+    return { launcher.launch("image/*") }
+}
+
+@Composable
+fun RkbWallpaperCard(modifier: Modifier = Modifier) {
+    val current = AllSettings.homeWallpaper.state
+    val pick = rememberWallpaperPicker()
 
     Surface(
         modifier = modifier,
@@ -64,7 +71,7 @@ fun RkbWallpaperCard(modifier: Modifier = Modifier) {
                 summary = if (current.isBlank()) "Default background. Pick an image to use on the Home screen."
                 else "Custom image is set."
             )
-            Button(onClick = { picker.launch("image/*") }) { Text("Choose") }
+            Button(onClick = pick) { Text("Choose") }
             if (current.isNotBlank()) {
                 OutlinedButton(onClick = {
                     runCatching { File(current).delete() }
