@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -33,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.movtery.zalithlauncher.R
 import com.movtery.zalithlauncher.ui.screens.NestedNavKey
 import com.movtery.zalithlauncher.ui.screens.NormalNavKey
@@ -76,22 +79,16 @@ fun RkbNavigationRail(
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
-        modifier = modifier.fillMaxHeight().width(132.dp),
+        modifier = modifier.fillMaxHeight().width(124.dp),
         color = scheme.surface
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = "RKB",
-                style = MaterialTheme.typography.titleLarge,
-                color = scheme.primary,
-                modifier = Modifier.padding(start = 10.dp, bottom = 6.dp)
-            )
             RkbDestination.entries.forEach { dest ->
                 RkbRailItem(dest, dest == selected) { onSelect(dest) }
             }
@@ -110,7 +107,7 @@ private fun RkbRailItem(dest: RkbDestination, selected: Boolean, onClick: () -> 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(36.dp)
             .background(bg, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp),
@@ -119,5 +116,58 @@ private fun RkbRailItem(dest: RkbDestination, selected: Boolean, onClick: () -> 
         Icon(painterResource(dest.icon), contentDescription = dest.label, tint = tint, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(10.dp))
         Text(dest.label, color = tint, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+    }
+}
+
+
+@Composable
+fun RkbBrandTitle() {
+    val scheme = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = androidx.compose.ui.text.buildAnnotatedString {
+                androidx.compose.ui.text.withStyle(androidx.compose.ui.text.SpanStyle(color = scheme.primary)) { append("RKB ") }
+                append("LAUNCHER")
+            },
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = "PLAY \u2022 EXPLORE \u2022 CREATE",
+            style = MaterialTheme.typography.labelSmall,
+            color = scheme.secondary,
+            letterSpacing = 2.sp,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
+@Composable
+fun RkbAccountChip() {
+    val scheme = MaterialTheme.colorScheme
+    val account = com.movtery.zalithlauncher.game.account.AccountsManager.currentAccountFlow
+        .collectAsState().value
+    val name = account?.username ?: "No account"
+    val kind = if (account == null) "ADD ACCOUNT" else if (account.accountType.isNullOrEmpty()) "LOCAL" else "ONLINE"
+    Row(
+        modifier = Modifier
+            .background(scheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(shape = androidx.compose.foundation.shape.CircleShape, color = scheme.primaryContainer, modifier = Modifier.size(24.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(name.take(1).uppercase(), style = MaterialTheme.typography.labelMedium, color = scheme.onPrimaryContainer)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(name, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(kind, style = MaterialTheme.typography.labelSmall, color = scheme.primary, maxLines = 1)
+        }
     }
 }
