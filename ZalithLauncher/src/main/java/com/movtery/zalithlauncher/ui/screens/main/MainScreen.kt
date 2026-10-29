@@ -28,6 +28,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
+import com.movtery.zalithlauncher.ui.screens.content.RkbSettingsHub
 import com.movtery.zalithlauncher.ui.screens.content.RkbHomeScreen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -204,6 +205,7 @@ fun MainScreen(
                             RkbDestination.About -> NormalNavKey.Settings.AboutInfo
                             else -> NormalNavKey.Settings.Renderer
                         }
+                        RkbSettingsHub.show = (dest == RkbDestination.Setting)
                         screenBackStackModel.settingsScreen.navigateTo(target)
                         screenBackStackModel.mainScreen.removeAndNavigateTo(
                             removes = clear, screenKey = screenBackStackModel.settingsScreen
