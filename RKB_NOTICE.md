@@ -21,3 +21,9 @@ Changed so far:
 Not done yet: header bar with account chip, Home banner layout, instances/download/mods card
 restyle, Settings card list, replacing Zalith logo/strings/links, About credits.
 Also unverified: Mods rail item opens the per-instance mod manager directly.
+
+## Batch 2 (still uncompiled)
+- Home replaced by `RkbHomeScreen` (wallpaper banner, version picker, PLAY, RAM/renderer card); Zalith `LauncherScreen` file kept but unused.
+- New setting `homeWallpaper` + `RkbWallpaperCard` in Settings > Launcher (picks an image, copies it into app storage).
+- Top bar: RKB title + tagline + account chip; folder/multiplayer/download/settings icons removed (the rail covers them).
+- Rail made compact (36dp items, no logo text) so all 8 items fit in landscape.

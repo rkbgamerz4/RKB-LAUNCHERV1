@@ -53,6 +53,9 @@ object AllSettings : SettingsRegistry() {
      */
     val renderer = stringSetting("renderer", "")
 
+    /** RKB: absolute path of the user-chosen Home wallpaper (empty = default background). */
+    val homeWallpaper = stringSetting("rkbHomeWallpaper", "")
+
     /**
      * Vulkan 驱动器
      */
