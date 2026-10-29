@@ -27,3 +27,14 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - New setting `homeWallpaper` + `RkbWallpaperCard` in Settings > Launcher (picks an image, copies it into app storage).
 - Top bar: RKB title + tagline + account chip; folder/multiplayer/download/settings icons removed (the rail covers them).
 - Rail made compact (36dp items, no logo text) so all 8 items fit in landscape.
+
+## Batch 3 (still uncompiled)
+- R logo (cut from user JPG) -> `res/drawable-nodpi/rkb_logo.png`; used in header and as adaptive launcher icon (background #05070C, monochrome layer removed).
+- Settings: inner Zalith tab rail replaced by a card-list hub (`RkbSettingsHub.kt`); each card opens an existing Zalith settings page, with a "Settings" back bar.
+- Download: inner left category rail replaced by horizontal tab chips (`RkbTabChip`).
+- Header chip now shows the account skin head (`PlayerFace`) plus a wallpaper button (`rememberWallpaperPicker`).
+- About credit string corrected ("Author of Zalith Launcher 2, the base of RKB LAUNCHER").
+- `libdiscord_partner_sdk.so` NOT added (no JNI/Java bindings, needs Discord app id; see chat).
+
+## Batch 4 (still uncompiled)
+- Instances: `RkbInstancesScreen.kt` replaces the Zalith list layout (search, sort, loader filter, New, empty state). Still uses Zalith's `VersionItemLayout` + rename/copy/export/delete dialogs. Not present any more: game-folder switcher and "clean up game files" buttons (old `VersionsManageScreen.kt` is kept in the tree, unused).

@@ -85,27 +85,37 @@ fun SettingsScreen(
         currentKey = backStackViewModel.mainScreen.currentKey
     ) { isVisible ->
 
-        Row(modifier = Modifier.fillMaxSize()) {
-            TabMenu(
-                modifier = Modifier.fillMaxHeight(),
-                isVisible = isVisible,
-                settingsScreenKey = backStackViewModel.settingsScreen.currentKey,
-                navigateTo = { settingKey ->
-                    key.backStack.navigateOnce(settingKey)
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (RkbSettingsHub.show) {
+                RkbSettingsHubScreen(
+                    onBackHome = {
+                        backStackViewModel.mainScreen.removeAndNavigateTo(
+                            remove = NestedNavKey.Settings::class,
+                            screenKey = NormalNavKey.LauncherMain
+                        )
+                    },
+                    onOpen = { settingKey ->
+                        RkbSettingsHub.show = false
+                        key.backStack.navigateOnce(settingKey)
+                    }
+                )
+            } else {
+                Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    RkbBar(text = "Settings") { RkbSettingsHub.show = true }
                 }
-            )
-            NavigationUI(
-                key = key,
-                mainScreenKey = backStackViewModel.mainScreen.currentKey,
-                settingsScreenKey = backStackViewModel.settingsScreen.currentKey,
-                onCurrentKeyChange = { newKey ->
-                    backStackViewModel.settingsScreen.currentKey = newKey
-                },
-                openLicenseScreen = openLicenseScreen,
-                eventViewModel = eventViewModel,
-                submitError = submitError,
-                modifier = Modifier.fillMaxHeight()
-            )
+                NavigationUI(
+                    key = key,
+                    mainScreenKey = backStackViewModel.mainScreen.currentKey,
+                    settingsScreenKey = backStackViewModel.settingsScreen.currentKey,
+                    onCurrentKeyChange = { newKey ->
+                        backStackViewModel.settingsScreen.currentKey = newKey
+                    },
+                    openLicenseScreen = openLicenseScreen,
+                    eventViewModel = eventViewModel,
+                    submitError = submitError,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            }
         }
     }
 }
