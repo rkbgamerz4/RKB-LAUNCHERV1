@@ -194,6 +194,7 @@ class MainActivity : BaseAppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.movtery.zalithlauncher.utils.RkbDiscord.init(this)
         //处理外部导入
         val isImporting = handleImportIfNeeded(intent)
 
