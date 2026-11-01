@@ -45,3 +45,7 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - Manifest redirect scheme `discord-1555829146490241095` on `com.discord.socialsdk.AuthenticationActivity`; dependency `androidx.browser:1.8.0`.
 - Token is kept only in private SharedPreferences `rkb_discord`; never logged.
 - Presence is set to "Playing Minecraft <version>" when PLAY is pressed. It is NOT cleared when the game process exits (not implemented).
+
+## Batch 6 (uncompiled)
+- Discord presence: cleared when the launcher goes to the background unless a game is running; "Playing" ends when the `<pkg>:game` process exits (polled every ~3s); reconnects on return using the saved login.
+- Home wallpaper accepts image, animated GIF/WebP (Android 9+) and video (looping, muted, center-crop) via `RkbWallpaperView.kt`; picker is the system photo picker (images + videos).

@@ -88,12 +88,7 @@ fun RkbHomeScreen(
             .background(Brush.linearGradient(listOf(Color(0xFF0B1E45), Color(0xFF3B2A5E), Color(0xFF05070C))))
     ) {
         if (wallpaperFile != null) {
-            AsyncImage(
-                model = wallpaperFile,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            RkbWallpaperView(file = wallpaperFile, modifier = Modifier.fillMaxSize())
         }
         // readability scrim on the left, where the text sits
         Box(

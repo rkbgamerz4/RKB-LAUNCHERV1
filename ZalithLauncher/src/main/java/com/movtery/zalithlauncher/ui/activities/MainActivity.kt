@@ -537,6 +537,16 @@ class MainActivity : BaseAppCompatActivity() {
         PluginLoader.loadAllPlugins(this, true)
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.movtery.zalithlauncher.utils.RkbDiscord.onForeground()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        com.movtery.zalithlauncher.utils.RkbDiscord.onBackground()
+    }
+
     override fun onDestroy() {
         fmEventRegistrar?.stop()
         fmEventRegistrar = null

@@ -3,7 +3,9 @@
  */
 package com.movtery.zalithlauncher.ui.screens.content.settings
 
+import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -34,11 +36,13 @@ fun rememberWallpaperPicker(): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val current = AllSettings.homeWallpaper.state
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
                 runCatching {
-                    val dest = File(context.filesDir, "rkb_home_wallpaper_" + System.currentTimeMillis())
+                    val mime = context.contentResolver.getType(uri)
+                    val ext = mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) } ?: "jpg"
+                    val dest = File(context.filesDir, "rkb_home_wallpaper_" + System.currentTimeMillis() + "." + ext)
                     val input = context.contentResolver.openInputStream(uri) ?: error("cannot open image")
                     input.use { ins -> dest.outputStream().use { out -> ins.copyTo(out) } }
                     if (current.isNotBlank()) File(current).delete()
@@ -47,7 +51,7 @@ fun rememberWallpaperPicker(): () -> Unit {
             }
         }
     }
-    return { launcher.launch("image/*") }
+    return { launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) }
 }
 
 @Composable
@@ -68,8 +72,8 @@ fun RkbWallpaperCard(modifier: Modifier = Modifier) {
             TitleAndSummary(
                 modifier = Modifier.weight(1f),
                 title = "Home wallpaper",
-                summary = if (current.isBlank()) "Default background. Pick an image to use on the Home screen."
-                else "Custom image is set."
+                summary = if (current.isBlank()) "Default background. Pick an image, GIF or video (plays muted, looping)."
+                else "Custom wallpaper is set (" + File(current).extension + ")."
             )
             Button(onClick = pick) { Text("Choose") }
             if (current.isNotBlank()) {
