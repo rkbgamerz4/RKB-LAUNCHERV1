@@ -194,6 +194,7 @@ class MainActivity : BaseAppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.movtery.zalithlauncher.utils.RkbDiscord.init(this)
         //处理外部导入
         val isImporting = handleImportIfNeeded(intent)
 
@@ -534,6 +535,16 @@ class MainActivity : BaseAppCompatActivity() {
         Renderers.init(true)
         // 重载插件
         PluginLoader.loadAllPlugins(this, true)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        com.movtery.zalithlauncher.utils.RkbDiscord.onForeground()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        com.movtery.zalithlauncher.utils.RkbDiscord.onBackground()
     }
 
     override fun onDestroy() {
