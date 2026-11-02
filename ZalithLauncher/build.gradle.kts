@@ -285,7 +285,7 @@ dependencies {
     implementation(libs.lunarcalendar)
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
     // RKB: required by the Discord Social SDK sign-in flow
-    implementation("androidx.browser:androidx.browser:1.8.0")
+    implementation("androidx.browser:browser:1.8.0")
     //Safe
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
