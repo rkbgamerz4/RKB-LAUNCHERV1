@@ -44,6 +44,19 @@
         android:allowNativeHeapPointerTagging="false"
         tools:targetApi="33"
         tools:ignore="DiscouragedApi">
+        <!-- RKB: Discord OAuth redirect discord-<APP_ID>:/authorize/callback -->
+        <activity
+            android:name="com.discord.socialsdk.AuthenticationActivity"
+            android:exported="true"
+            tools:node="merge">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="discord-1555829146490241095" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".ui.activities.SplashActivity"
             android:launchMode="singleTop"

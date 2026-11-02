@@ -37,7 +37,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import com.movtery.zalithlauncher.R
 import com.movtery.zalithlauncher.ui.screens.NestedNavKey
@@ -135,7 +134,7 @@ fun RkbBrandTitle() {
         Spacer(Modifier.width(8.dp))
         Text(
             text = androidx.compose.ui.text.buildAnnotatedString {
-                withStyle(androidx.compose.ui.text.SpanStyle(color = scheme.primary)) { append("RKB ") }
+                androidx.compose.ui.text.withStyle(androidx.compose.ui.text.SpanStyle(color = scheme.primary)) { append("RKB ") }
                 append("LAUNCHER")
             },
             style = MaterialTheme.typography.titleMedium,

@@ -135,3 +135,6 @@ LOCAL_SRC_FILES := flite_cmu_us_kal16.c
 include $(BUILD_SHARED_LIBRARY)
 
 LOCAL_PATH := $(HERE_PATH)
+
+include $(HERE_PATH)/rkb_discord/Android.mk
+LOCAL_PATH := $(HERE_PATH)

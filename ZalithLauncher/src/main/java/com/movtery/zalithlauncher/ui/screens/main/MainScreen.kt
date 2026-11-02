@@ -538,6 +538,7 @@ private fun NavigationUI(
                         onPlay = {
                             val target = VersionsManager.currentVersion.value?.takeIf { it.isValid() }
                             if (target != null) {
+                                com.movtery.zalithlauncher.utils.RkbDiscord.setPlaying(target.getVersionName())
                                 eventViewModel.sendEvent(EventViewModel.Event.Launch.Game(target))
                             } else {
                                 eventViewModel.sendToast(androidText(R.string.game_launch_no_version))
