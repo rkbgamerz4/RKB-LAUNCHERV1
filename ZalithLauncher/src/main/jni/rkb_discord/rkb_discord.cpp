@@ -3,6 +3,9 @@
 #include <android/log.h>
 #include <memory>
 #include <string>
+// The SDK header only declares the C++ wrapper; exactly one translation unit must
+// define this macro to compile the wrapper bodies (they call the exported C API).
+#define DISCORDPP_IMPLEMENTATION
 #include "discordpp.h"
 
 #define TAG "RkbDiscord"
