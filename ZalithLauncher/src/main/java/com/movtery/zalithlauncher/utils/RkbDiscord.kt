@@ -37,14 +37,20 @@ object RkbDiscord {
     private var playingSinceMs = 0L
     private var inForeground = true
     private var suspended = false
-    private var tick = 0
+    private var lastWatchMs = 0L
 
     private val pump = object : Runnable {
         override fun run() {
             if (!loaded) return
             runCatching { nativeRunCallbacks() }
-            if (++tick % 30 == 0) watchGame()
-            handler.postDelayed(this, 100)
+            val now = System.currentTimeMillis()
+            if (now - lastWatchMs >= 3000) {
+                lastWatchMs = now
+                watchGame()
+            }
+            // 10 wake-ups per second only while the launcher is on screen; 1 per second in the background
+            // so the launcher process stays idle while the game is running.
+            handler.postDelayed(this, if (inForeground) 100L else 1000L)
         }
     }
 
