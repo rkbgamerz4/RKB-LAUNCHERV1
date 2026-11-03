@@ -32,6 +32,8 @@ import com.movtery.zalithlauncher.setting.AllSettings
 import com.movtery.zalithlauncher.utils.file.readString
 import com.movtery.zalithlauncher.utils.logging.Logger
 import kotlinx.coroutines.CoroutineScope
+import android.content.res.Resources
+import com.movtery.layer_controller.pojav.PojavLayoutConverter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -217,7 +219,19 @@ object ControlManager {
         try {
             inputStream.use { stream ->
                 val jsonString = stream.readString()
-                val layout = loadLayoutFromString(jsonString)
+                val layout = if (PojavLayoutConverter.looksLikePojav(jsonString)) {
+                    // PojavLauncher layout: convert (keys, sizes, dynamic positions, drawers) to the RKB layer format
+                    val dm = Resources.getSystem().displayMetrics
+                    PojavLayoutConverter.importPojav(
+                        jsonString = jsonString,
+                        screenWidthPx = dm.widthPixels,
+                        screenHeightPx = dm.heightPixels,
+                        density = dm.density,
+                        layoutName = "Pojav import"
+                    ).layout
+                } else {
+                    loadLayoutFromString(jsonString)
+                }
                 layout.saveToFile(file)
             }
             onFinished()

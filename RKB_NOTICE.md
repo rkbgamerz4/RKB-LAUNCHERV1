@@ -49,3 +49,9 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 ## Batch 6 (uncompiled)
 - Discord presence: cleared when the launcher goes to the background unless a game is running; "Playing" ends when the `<pkg>:game` process exits (polled every ~3s); reconnects on return using the saved login.
 - Home wallpaper accepts image, animated GIF/WebP (Android 9+) and video (looping, muted, center-crop) via `RkbWallpaperView.kt`; picker is the system photo picker (images + videos).
+
+## Batch 7: in-game R logo + Pojav layout compatibility (uncompiled)
+- In-game floating ball (`GameBall.kt`): menu icon replaced with the RKB R logo inside a #00A8FF ring; tap behaviour unchanged (opens the existing in-game menu).
+- `LayerController/.../pojav/PojavLayoutConverter.kt`: PojavLauncher control-layout (v2-v8) importer/exporter. No Pojav source was copied; only the file format (documented by reading Pojav's `customcontrols` package) is re-implemented.
+- Import hook in `ControlManager.importControl` (Pojav JSON is detected and converted); export card `RkbPojavExportCard` in Settings > Control.
+- NOT done: porting Pojav's View-based runtime (ControlLayout/ControlButton/touch handling) into the game screen. Zalith's runtime is still the one running.
