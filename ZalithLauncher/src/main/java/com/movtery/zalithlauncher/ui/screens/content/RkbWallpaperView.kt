@@ -11,6 +11,7 @@ import android.graphics.drawable.AnimatedImageDrawable
 import android.media.MediaPlayer
 import android.os.Build
 import android.view.Surface
+import android.view.View
 import android.view.TextureView
 import android.widget.ImageView
 import androidx.compose.runtime.Composable
@@ -97,6 +98,16 @@ private class VideoWallpaperView(context: Context) : TextureView(context), Textu
     private fun release() {
         runCatching { player?.release() }
         player = null
+    }
+
+    /** Free the decoder as soon as the launcher is not visible (e.g. while the game runs) so it never competes for CPU/GPU. */
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != View.VISIBLE) {
+            release()
+        } else if (player == null) {
+            surface?.let { start(it) }
+        }
     }
 
     override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {

@@ -55,3 +55,7 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - `LayerController/.../pojav/PojavLayoutConverter.kt`: PojavLauncher control-layout (v2-v8) importer/exporter. No Pojav source was copied; only the file format (documented by reading Pojav's `customcontrols` package) is re-implemented.
 - Import hook in `ControlManager.importControl` (Pojav JSON is detected and converted); export card `RkbPojavExportCard` in Settings > Control.
 - NOT done: porting Pojav's View-based runtime (ControlLayout/ControlButton/touch handling) into the game screen. Zalith's runtime is still the one running.
+
+## Batch 8: launcher-side idle cost (uncompiled)
+- Video wallpaper releases its decoder whenever the launcher window is not visible (e.g. while the game runs).
+- Discord callback pump drops from 10/s to 1/s while the launcher is in the background; game-process check is time-based (3 s).
