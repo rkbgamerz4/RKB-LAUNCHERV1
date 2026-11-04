@@ -65,3 +65,9 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - versionCode = GITHUB_RUN_NUMBER on CI.
 - Release workflow `rkb-release.yml` (R8-minified; signed with the same key unless RKB_KEYSTORE* env is provided). Keep rules added for RkbDiscord / Discord SDK / key tables.
 - Control editor menu ball now shows the R logo too.
+
+## Batch 10: launch speed + honest timing (uncompiled, NOT benchmarked)
+- Finding (read from source): every PLAY runs a verify step that SHA-1 hashes every existing game file (client jar, libraries, all asset objects) via `compareSHA1` / `DownloadTask.existingFileValid` unless the per-version "skip integrity check" is on.
+- `VerifiedHashCache`: trusts a file only if path, size, mtime and expected SHA-1 match a previous successful full verification (cache file `rkb_verified_files.tsv`). Setting `rkbFastVerify` (default on) in Settings > Game.
+- `RkbLaunchTrace`: records launcher-side PLAY time (ms) plus hashing counters in `rkb_launch_times.tsv`; shown in Settings > Game. It does not time Minecraft startup or world loading.
+- No JVM/GC/thread/chunk changes were made: no measurement exists to justify any.

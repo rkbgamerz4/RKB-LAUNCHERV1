@@ -56,6 +56,10 @@ fun File.ifExists() = this.takeIf { it.exists() }
 fun compareSHA1(file: File, sourceSHA: String?, default: Boolean = false): Boolean {
     if (!file.exists()) return false //文件不存在
 
+    // RKB: unchanged files that were already fully verified are not hashed again
+    if (sourceSHA != null && VerifiedHashCache.isVerified(file, sourceSHA)) return true
+
+    val startNanos = System.nanoTime()
     val computedSHA = runCatching {
         FileInputStream(file).use { fis ->
             String(Hex.encodeHex(DigestUtils.sha1(fis)))
@@ -64,8 +68,15 @@ fun compareSHA1(file: File, sourceSHA: String?, default: Boolean = false): Boole
         Logger.info(TAG, "An exception occurred while reading, returning the default value.", e)
         return default
     }
+    val hashNanos = System.nanoTime() - startNanos
 
-    return sourceSHA?.equals(computedSHA, ignoreCase = true) ?: default
+    val matches = sourceSHA?.equals(computedSHA, ignoreCase = true) ?: default
+    if (sourceSHA != null && matches) {
+        VerifiedHashCache.record(file, computedSHA, hashNanos)
+    } else {
+        VerifiedHashCache.addHashTime(hashNanos)
+    }
+    return matches
 }
 
 suspend fun calculateFileSha1(file: File): String = withContext(Dispatchers.IO) {
