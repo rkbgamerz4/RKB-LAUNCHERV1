@@ -19,6 +19,9 @@
 package com.movtery.zalithlauncher.ui.screens.main.control_editor
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.Image
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -201,22 +204,19 @@ fun MenuBox(
         Box(
             modifier = Modifier
                 .padding(all = 2.dp)
-                .size(28.dp),
+                .size(28.dp)
+                .clip(CircleShape)
+                .border(1.5.dp, Color(0xFF00A8FF), CircleShape)
+                .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
-            Crossfade(opened) { state ->
-                Icon(
-                    modifier = Modifier.size(24.dp),
-                    painter = painterResource(
-                        if (state) {
-                            R.drawable.ic_menu_open
-                        } else {
-                            R.drawable.ic_menu
-                        }
-                    ),
-                    contentDescription = null
-                )
-            }
+            Image(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (opened) 0.7f else 1f),
+                painter = painterResource(R.drawable.rkb_logo),
+                contentDescription = "RKB menu"
+            )
         }
     }
 }

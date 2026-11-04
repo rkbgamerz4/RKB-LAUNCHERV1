@@ -59,3 +59,8 @@
 
 # SoraEditor language-textmate
 -keep class org.jcodings.** { *; }
+# RKB: native code calls back into this class by name, and the converter reads key constants by reflection
+-keep class com.movtery.zalithlauncher.utils.RkbDiscord { *; }
+-keep class com.discord.socialsdk.** { *; }
+-keep class com.movtery.inputmap.keycodes.LwjglGlfwKeycode { *; }
+-keep class com.movtery.inputmap.keycodes.ControlEventKeycode { *; }

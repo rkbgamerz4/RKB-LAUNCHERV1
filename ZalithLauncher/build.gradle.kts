@@ -47,7 +47,15 @@ android {
     }
 
     signingConfigs {
-        // RKB: no keystores are bundled. Release signing is only configured when
+        // RKB: fixed DEBUG-ONLY key (public password "android", like Android's own debug key) so every CI build
+        // is signed identically and installs as an UPDATE over the previous one. Never use it to publish.
+        create("rkbDebugKey") {
+            storeFile = file("rkb-debug.jks")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        // RKB: release signing is only configured when Release signing is only configured when
         // RKB_KEYSTORE / RKB_KEYSTORE_PASSWORD / RKB_KEY_ALIAS / RKB_KEY_PASSWORD are provided.
         System.getenv("RKB_KEYSTORE")?.let { ks ->
             create("releaseBuild") {
@@ -63,7 +71,7 @@ android {
         applicationId = "com.rkbgamerz.rkblauncher"
         minSdk = 26
         targetSdk = 34
-        versionCode = launcherVersionCode
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: launcherVersionCode
         versionName = launcherVersionName
         manifestPlaceholders["launcher_name"] = launcherAPPName
     }
@@ -72,13 +80,15 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.findByName("releaseBuild")
+            // Release builds use the real release key when provided, otherwise the fixed debug key (installable, updatable)
+            signingConfig = signingConfigs.findByName("releaseBuild") ?: signingConfigs.getByName("rkbDebugKey")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
         debug {
+            signingConfig = signingConfigs.getByName("rkbDebugKey")
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"

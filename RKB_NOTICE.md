@@ -59,3 +59,9 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 ## Batch 8: launcher-side idle cost (uncompiled)
 - Video wallpaper releases its decoder whenever the launcher window is not visible (e.g. while the game runs).
 - Discord callback pump drops from 10/s to 1/s while the launcher is in the background; game-process check is time-based (3 s).
+
+## Batch 9 (uncompiled)
+- Fixed DEBUG-ONLY signing key `ZalithLauncher/rkb-debug.jks` (public password "android"): every CI build is signed the same, so installs update in place. Not for publishing. Deliberately tracked (`.gitignore` exception). Remove it if you prefer secrets-based signing.
+- versionCode = GITHUB_RUN_NUMBER on CI.
+- Release workflow `rkb-release.yml` (R8-minified; signed with the same key unless RKB_KEYSTORE* env is provided). Keep rules added for RkbDiscord / Discord SDK / key tables.
+- Control editor menu ball now shows the R logo too.
