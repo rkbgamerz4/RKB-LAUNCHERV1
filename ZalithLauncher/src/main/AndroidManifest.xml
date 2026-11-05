@@ -237,6 +237,7 @@
     </application>
     <queries>
         <package android:name="net.kdt.pojavlaunch.ffmpeg"/>
+        <package android:name="dev.horizonlab.horizon"/>
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>

@@ -84,6 +84,12 @@ import com.movtery.zalithlauncher.viewmodel.ScreenBackStackViewModel
  * 导航至DownloadScreen
  */
 fun ScreenBackStackViewModel.navigateToDownload(targetScreen: TitledNavKey? = null) {
+    // RKB: the category hub is the landing page; deep links go straight to their own category
+    RkbDownloadHub.page = when {
+        targetScreen == null -> RkbDownloadHub.Page.Hub
+        targetScreen === downloadModPackScreen -> RkbDownloadHub.Page.ModPack
+        else -> RkbDownloadHub.Page.Normal
+    }
     downloadScreen.clearWith(targetScreen ?: downloadGameScreen)
     mainScreen.removeAndNavigateTo(
         removes = clearBeforeNavKeys,
@@ -141,21 +147,47 @@ fun DownloadScreen(
         useClassEquality = true
     ) { isVisible: Boolean ->
         Column(modifier = Modifier.fillMaxSize()) {
-            TabMenu(
-                modifier = Modifier.fillMaxWidth(),
-                isVisible = isVisible,
-                backStack = key.backStack,
-                backScreenViewModel = backScreenViewModel,
-            )
+            val page = RkbDownloadHub.page
+            if (page == RkbDownloadHub.Page.Hub) {
+                RkbDownloadHubScreen(
+                    onNormal = {
+                        RkbDownloadHub.page = RkbDownloadHub.Page.Normal
+                        key.backStack.navigateOnce(backScreenViewModel.downloadGameScreen)
+                    },
+                    onModpack = {
+                        RkbDownloadHub.page = RkbDownloadHub.Page.ModPack
+                        key.backStack.navigateOnce(backScreenViewModel.downloadModPackScreen)
+                    },
+                    onRust = { RkbDownloadHub.page = RkbDownloadHub.Page.Rust },
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            } else {
+                Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    RkbBar(text = "Download categories") { RkbDownloadHub.page = RkbDownloadHub.Page.Hub }
+                }
+                if (page == RkbDownloadHub.Page.Rust) {
+                    RkbHorizonScreen(modifier = Modifier.weight(1f).fillMaxWidth())
+                } else {
+                    if (page == RkbDownloadHub.Page.Normal) {
+                        TabMenu(
+                            modifier = Modifier.fillMaxWidth(),
+                            isVisible = isVisible,
+                            backStack = key.backStack,
+                            backScreenViewModel = backScreenViewModel,
+                            hideModpack = true
+                        )
+                    }
 
-            NavigationUI(
-                key = key,
-                backScreenViewModel = backScreenViewModel,
-                eventViewModel = eventViewModel,
-                modpackImportViewModel = modpackImportViewModel,
-                submitError = submitError,
-                modifier = Modifier.weight(1f).fillMaxWidth()
-            )
+                    NavigationUI(
+                        key = key,
+                        backScreenViewModel = backScreenViewModel,
+                        eventViewModel = eventViewModel,
+                        modpackImportViewModel = modpackImportViewModel,
+                        submitError = submitError,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    )
+                }
+            }
         }
     }
 }
@@ -166,6 +198,7 @@ private fun TabMenu(
     isVisible: Boolean,
     backStack: NavBackStack<TitledNavKey>,
     backScreenViewModel: ScreenBackStackViewModel,
+    hideModpack: Boolean = false,
 ) {
     val downloadsList = listOf(
         CategoryItem(backScreenViewModel.downloadGameScreen, { CategoryIcon(R.drawable.ic_sports_esports_outlined, R.string.download_category_game) }, R.string.download_category_game),
@@ -176,7 +209,7 @@ private fun TabMenu(
         CategoryItem(backScreenViewModel.downloadShadersScreen, { CategoryIcon(R.drawable.ic_lightbulb, R.string.download_category_shaders) }, R.string.download_category_shaders),
         CategoryItem(NormalNavKey.SearchId, { CategoryIcon(R.drawable.ic_card, R.string.download_category_by_id) }, R.string.download_category_by_id, division = true),
         CategoryItem(backScreenViewModel.downloadFavoritesScreen, { CategoryIcon(R.drawable.ic_favorite_outlined, R.string.download_category_favorites) }, R.string.download_category_favorites),
-    )
+    ).filter { !(hideModpack && it.key === backScreenViewModel.downloadModPackScreen) }
 
     val scrollState = rememberScrollState()
     Row(
