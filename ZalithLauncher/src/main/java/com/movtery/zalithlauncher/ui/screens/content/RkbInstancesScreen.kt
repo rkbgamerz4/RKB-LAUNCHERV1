@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,6 +69,9 @@ fun RkbInstancesScreen(
     val allVersions by VersionsManager.versions.collectAsStateWithLifecycle()
     val current by VersionsManager.currentVersion.collectAsStateWithLifecycle()
 
+    val appContext = androidx.compose.ui.platform.LocalContext.current
+    val horizonVersion = remember { com.movtery.zalithlauncher.utils.RkbHorizon.installedVersion(appContext) }
+
     var query by remember { mutableStateOf("") }
     var sort by remember { mutableIntStateOf(0) } // 0 default order, 1 name A-Z, 2 name Z-A
     var loaderChoice by remember { mutableStateOf(LOADER_ALL) }
@@ -96,6 +100,9 @@ fun RkbInstancesScreen(
                 }
             }
     }
+
+    val showHorizon = horizonVersion != null && loaderChoice == LOADER_ALL &&
+        (query.isBlank() || "horizon rust edition".contains(query.trim(), ignoreCase = true))
 
     BaseScreen(
         screenKey = NormalNavKey.VersionsManager,
@@ -161,12 +168,15 @@ fun RkbInstancesScreen(
                 color = scheme.surface,
                 border = BorderStroke(1.dp, scheme.outlineVariant)
             ) {
-                if (shown.isNotEmpty()) {
+                if (shown.isNotEmpty() || showHorizon) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        if (showHorizon) {
+                            item { RkbHorizonInstanceCard(horizonVersion ?: "?") }
+                        }
                         items(shown, key = { it.toString() }) { version ->
                             VersionItemLayout(
                                 modifier = Modifier.fillMaxWidth(),
@@ -226,6 +236,28 @@ private fun RkbDropdown(label: String, options: List<Pair<String, () -> Unit>>) 
             options.forEach { (text, action) ->
                 DropdownMenuItem(text = { Text(text) }, onClick = { open = false; action() })
             }
+        }
+    }
+}
+
+/** Entry for the separately installed Horizon (Rust Edition) app. It starts the external native app, not the Java pipeline. */
+@Composable
+private fun RkbHorizonInstanceCard(version: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = scheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, Color(0xFFFF6A1A))
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Horizon 26.3", style = MaterialTheme.typography.titleMedium)
+                Text("Minecraft Rust Edition, external native app (app version $version)", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                Text("Loader: Native", style = MaterialTheme.typography.labelMedium, color = Color(0xFFFF6A1A))
+            }
+            Button(onClick = { com.movtery.zalithlauncher.utils.RkbHorizon.launch(context) }) { Text("PLAY") }
         }
     }
 }

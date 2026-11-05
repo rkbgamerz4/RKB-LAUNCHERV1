@@ -18,6 +18,10 @@
 
 package com.movtery.zalithlauncher.ui.screens.content.download
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -299,60 +303,63 @@ fun DownloadModPackScreen(
         }
     )
 
-    if (backStack.isNotEmpty()) {
-        NavDisplay(
-            backStack = backStack,
-            modifier = Modifier.fillMaxSize(),
-            onBack = {
-                onBack(backStack)
-            },
-            entryDecorators = listOf(
-                rememberSaveableStateHolderNavEntryDecorator(),
-                rememberViewModelStoreNavEntryDecorator()
-            ),
-            transitionSpec = rememberTransitionSpec(),
-            popTransitionSpec = rememberTransitionSpec(),
-            entryProvider = entryProvider {
-                entry<NormalNavKey.SearchModPack> {
-                    SearchModPackScreen(
-                        mainScreenKey = mainScreenKey,
-                        downloadScreenKey = downloadScreenKey,
-                        downloadModPackScreenKey = key,
-                        downloadModPackScreenCurrentKey = downloadModPackScreenKey,
-                        viewModel = importerViewModel,
-                        eventViewModel = eventViewModel
-                    ) { platform, projectId, iconUrl ->
-                        backStack.navigateTo(
-                            NormalNavKey.DownloadAssets(platform, projectId, PlatformClasses.MOD_PACK, iconUrl)
-                        )
+    // RKB: split browser. Left: search + results. Right: versions of the selected modpack.
+    var selectedAssets by remember { mutableStateOf<NormalNavKey.DownloadAssets?>(null) }
+
+    val searchPane: @Composable () -> Unit = {
+        SearchModPackScreen(
+            mainScreenKey = mainScreenKey,
+            downloadScreenKey = downloadScreenKey,
+            downloadModPackScreenKey = key,
+            downloadModPackScreenCurrentKey = downloadModPackScreenKey,
+            viewModel = importerViewModel,
+            eventViewModel = eventViewModel
+        ) { platform, projectId, iconUrl ->
+            selectedAssets = NormalNavKey.DownloadAssets(platform, projectId, PlatformClasses.MOD_PACK, iconUrl)
+        }
+    }
+    val versionsPane: @Composable (NormalNavKey.DownloadAssets) -> Unit = { assetsKey ->
+        androidx.compose.runtime.key(assetsKey) {
+            DownloadAssetsScreen(
+                mainScreenKey = mainScreenKey,
+                parentScreenKey = key,
+                parentCurrentKey = downloadScreenKey,
+                currentKey = assetsKey,
+                key = assetsKey,
+                eventViewModel = eventViewModel,
+                onItemClicked = { _, version, iconUrl, _ ->
+                    if (viewModel.installOperation !is ModPackInstallOperation.None) {
+                        //不是待安装状态，拒绝此次安装
+                        return@DownloadAssetsScreen
+                    }
+                    viewModel.installOperation = if (!NotificationManager.checkNotificationEnabled(context)) {
+                        //警告通知权限
+                        ModPackInstallOperation.WarningForNotification(version, iconUrl)
+                    } else {
+                        ModPackInstallOperation.Warning(version, iconUrl)
                     }
                 }
-                entry<NormalNavKey.DownloadAssets> { assetsKey ->
-                    DownloadAssetsScreen(
-                        mainScreenKey = mainScreenKey,
-                        parentScreenKey = key,
-                        parentCurrentKey = downloadScreenKey,
-                        currentKey = downloadModPackScreenKey,
-                        key = assetsKey,
-                        eventViewModel = eventViewModel,
-                        onItemClicked = { _, version, iconUrl, _ ->
-                            if (viewModel.installOperation !is ModPackInstallOperation.None) {
-                                //不是待安装状态，拒绝此次安装
-                                return@DownloadAssetsScreen
-                            }
-                            viewModel.installOperation = if (!NotificationManager.checkNotificationEnabled(context)) {
-                                //警告通知权限
-                                ModPackInstallOperation.WarningForNotification(version, iconUrl)
-                            } else {
-                                ModPackInstallOperation.Warning(version, iconUrl)
-                            }
-                        }
-                    )
+            )
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val selected = selectedAssets
+        if (maxWidth > maxHeight) {
+            Row(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(if (selected == null) 1f else 0.58f).fillMaxHeight()) { searchPane() }
+                if (selected != null) {
+                    Box(Modifier.weight(0.42f).fillMaxHeight().padding(start = 8.dp)) { versionsPane(selected) }
                 }
             }
-        )
-    } else {
-        Box(Modifier.fillMaxSize())
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxWidth()) { searchPane() }
+                if (selected != null) {
+                    Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)) { versionsPane(selected) }
+                }
+            }
+        }
     }
 }
 
