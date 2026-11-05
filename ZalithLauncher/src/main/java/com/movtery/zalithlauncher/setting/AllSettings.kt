@@ -132,6 +132,9 @@ object AllSettings : SettingsRegistry() {
      */
     val skipGameIntegrityCheck = boolSetting("skipGameIntegrityCheck", false)
 
+    /** RKB: skip re-hashing game files whose size/mtime are unchanged since their last successful verification. */
+    val rkbFastVerify = boolSetting("rkbFastVerify", true)
+
     /**
      * 版本自定义信息
      */

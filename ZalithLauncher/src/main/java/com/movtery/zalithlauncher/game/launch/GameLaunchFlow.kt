@@ -100,6 +100,7 @@ class GameLaunchFlow(scope: CoroutineScope) {
 
         val account = AccountsManager.currentAccountFlow.value ?: return
 
+        RkbLaunchTrace.begin(version.getVersionName())
         taskExecutor.executePhasesAsync(
             onStart = {
                 taskExecutor.addPhases(
@@ -214,6 +215,7 @@ class GameLaunchFlow(scope: CoroutineScope) {
                 icon = R.drawable.ic_rocket_launch_filled,
                 title = androidText(R.string.main_launch_game)
             ) { _ ->
+                RkbLaunchTrace.preLaunchDone()
                 runGame(context, version, account)
                 exitActivity()
             }
