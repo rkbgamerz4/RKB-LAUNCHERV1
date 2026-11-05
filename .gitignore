@@ -38,3 +38,6 @@ LWJGL/*/build/
 .store_password.txt
 .key_password.txt
 local.properties
+
+# RKB: the fixed DEBUG-ONLY signing key (public password) is intentionally tracked so CI builds update in place
+!ZalithLauncher/rkb-debug.jks
