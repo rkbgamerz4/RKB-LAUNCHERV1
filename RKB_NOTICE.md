@@ -71,3 +71,8 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - `VerifiedHashCache`: trusts a file only if path, size, mtime and expected SHA-1 match a previous successful full verification (cache file `rkb_verified_files.tsv`). Setting `rkbFastVerify` (default on) in Settings > Game.
 - `RkbLaunchTrace`: records launcher-side PLAY time (ms) plus hashing counters in `rkb_launch_times.tsv`; shown in Settings > Game. It does not time Minecraft startup or world loading.
 - No JVM/GC/thread/chunk changes were made: no measurement exists to justify any.
+
+## Batch 11 (branch feature/rkb-instance-download-horizon; uncompiled, untested)
+- Instance Download hub (3 category cards: Normal Versions / Modpack / Rust Edition), landscape row + portrait column. Normal hides the Modpack tab; Modpack shows no tab row.
+- Modpack browser: split layout (results left, versions of the selected pack right) reusing the existing Modrinth/CurseForge search, version list and installer.
+- Rust Edition: verified compatibility panel + external-app launch of the unofficial Android port; Horizon card in Instances. See HORIZON_INTEGRATION.md.
