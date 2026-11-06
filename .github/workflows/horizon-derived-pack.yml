@@ -116,14 +116,14 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$MC_VERSION" != "26.3" ]; then
-        echo "::error::No pinned manifest configured for $MC_VERSION"
-        exit 1
-      fi
-      DEST="$HOME/.minecraft/versions/$MC_VERSION/$MC_VERSION.json"
-      URL="https://piston-meta.mojang.com/v1/packages/11f1aefe473eefba0af62e3286c33b692807b2eb/26.3.json"
-      mkdir -p "$(dirname "$DEST")"
-      curl -fL --retry 3 "$URL" -o "$DEST"
-      echo "11f1aefe473eefba0af62e3286c33b692807b2eb  $DEST" | sha1sum -c -
+            echo "::error::No pinned manifest configured for $MC_VERSION"
+            exit 1
+          fi
+          DEST="$HOME/.minecraft/versions/$MC_VERSION/$MC_VERSION.json"
+          URL="https://piston-meta.mojang.com/v1/packages/11f1aefe473eefba0af62e3286c33b692807b2eb/26.3.json"
+          mkdir -p "$(dirname "$DEST")"
+          curl -fL --retry 3 "$URL" -o "$DEST"
+          echo "11f1aefe473eefba0af62e3286c33b692807b2eb  $DEST" | sha1sum -c -
 
       - name: horizon-prepare --prepare (Horizon's own tool, JDK 25)
         working-directory: horizon
