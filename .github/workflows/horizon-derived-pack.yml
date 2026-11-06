@@ -76,7 +76,7 @@ jobs:
 
       - name: Build ~/.minecraft + server jar from Mojang (SHA-1 verified)
         run: |
-      set -euo pipefail
+          set -euo pipefail
           python3 rkb/tools/horizon/build_minecraft_dir.py \
             --version "${{ inputs.mc_version }}" \
             --mc-dir "$HOME/.minecraft" \
@@ -111,11 +111,11 @@ jobs:
         run: cargo run --release -p horizon-prepare -- --help 2>&1 | tee ../prepare-help.txt
 
       - name: Install Horizon-pinned Minecraft 26.3 version JSON
-    env:
-      MC_VERSION: ${{ inputs.mc_version }}
-    run: |
-      set -euo pipefail
-      if [ "$MC_VERSION" != "26.3" ]; then
+        env:
+          MC_VERSION: ${{ inputs.mc_version }}
+        run: |
+          set -euo pipefail
+          if [ "$MC_VERSION" != "26.3" ]; then
         echo "::error::No pinned manifest configured for $MC_VERSION"
         exit 1
       fi
@@ -125,19 +125,19 @@ jobs:
       curl -fL --retry 3 "$URL" -o "$DEST"
       echo "11f1aefe473eefba0af62e3286c33b692807b2eb  $DEST" | sha1sum -c -
 
-  - name: horizon-prepare --prepare (Horizon's own tool, JDK 25)
+      - name: horizon-prepare --prepare (Horizon's own tool, JDK 25)
         working-directory: horizon
         env:
           HORIZON_SERVER_JAR: ${{ runner.temp }}/server.jar
         run: |
-      set -euo pipefail
+          set -euo pipefail
           export HORIZON_MINECRAFT_DIR="$HOME/.minecraft"
           cargo run --release -p horizon-prepare -- --prepare --server-jar "$HORIZON_SERVER_JAR" 2>&1 | tee ../prepare.log
 
       - name: Pack horizon-derived.zip (Horizon's own script)
         working-directory: horizon
         run: |
-      set -euo pipefail
+          set -euo pipefail
           bash packaging/android/make_derived_pack.sh 2>&1 | tee ../pack.log
           ls -l target/android/horizon-derived.zip
 
