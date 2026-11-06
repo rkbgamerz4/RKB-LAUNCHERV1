@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch, tag or commit of Rayan-XOO/horizon (the log prints the exact SHA; pin it afterwards)"
+        description: "Tag or commit of Rayan-XOO/horizon. Default = release 0.3.8 (tag android-v0.3.8, commit fc3e4d395016ae7210d1f54da5a09c0b2763b9ea)"
         required: true
-        default: android-port
+        default: fc3e4d395016ae7210d1f54da5a09c0b2763b9ea
       profile:
         description: "release = slow build, fast game; debug = quick build, slow game"
         required: true
