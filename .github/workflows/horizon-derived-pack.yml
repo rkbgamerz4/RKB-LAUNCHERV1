@@ -1,0 +1,176 @@
+name: Horizon derived pack (horizon-derived.zip) - PRIVATE REPOSITORIES ONLY
+# Builds horizon-derived.zip with Horizon's own tools from YOUR copy of Minecraft Java 26.3 fetched from
+# Mojang's official servers (SHA-1 verified). The result is derived from Mojang's game: it must never be
+# published or shared. This workflow therefore REFUSES to run in a public repository.
+#
+# Steps = the documented process (README "Build from source" + ANDROID.md "First-run download"):
+#   1. build ~/.minecraft for 26.3 + the server jar from piston-meta
+#   2. horizon-prepare --prepare --server-jar ...        (JDK 25 + Rust)
+#   3. packaging/android/make_derived_pack.sh            -> target/android/horizon-derived.zip
+on:
+  workflow_dispatch:
+    inputs:
+      horizon_ref:
+        description: "Tag or commit of Rayan-XOO/horizon (default = 0.3.8)"
+        required: true
+        default: fc3e4d395016ae7210d1f54da5a09c0b2763b9ea
+      mc_version:
+        description: "Minecraft Java version to prepare"
+        required: true
+        default: "26.3"
+      i_own_minecraft_java:
+        description: "I own Minecraft: Java Edition and will keep the output private"
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  derived:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Guard - private repository and ownership confirmation
+        env:
+          IS_PRIVATE: ${{ github.event.repository.private }}
+          OWNS: ${{ inputs.i_own_minecraft_java }}
+        run: |
+          if [ "$IS_PRIVATE" != "true" ]; then
+            echo "::error::This repository is public. A derived pack is derived from Mojang's game and must not be exposed (public workflow artifacts can be downloaded by anyone). Run this workflow in a PRIVATE repository."
+            exit 1
+          fi
+          if [ "$OWNS" != "true" ]; then
+            echo "::error::Confirm that you own Minecraft: Java Edition (input i_own_minecraft_java)."
+            exit 1
+          fi
+
+      - name: Checkout (this repo, for the helper script)
+        uses: actions/checkout@v4
+        with:
+          path: rkb
+
+      - name: Checkout Horizon (unofficial Android port)
+        uses: actions/checkout@v4
+        with:
+          repository: Rayan-XOO/horizon
+          ref: ${{ inputs.horizon_ref }}
+          path: horizon
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: horizon
+
+      - name: System packages (as listed in the README)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - name: Versions
+        run: |
+          java -version 2>&1 | head -1; rustc --version; python3 --version
+          cd horizon && git log -1 --format='horizon source: %H %cI %s'
+
+      - name: Build ~/.minecraft + server jar from Mojang (SHA-1 verified)
+        run: |
+          python3 rkb/tools/horizon/build_minecraft_dir.py \
+            --version "${{ inputs.mc_version }}" \
+            --mc-dir "$HOME/.minecraft" \
+            --server-jar "$RUNNER_TEMP/server.jar" | tee mc-fetch.log
+          grep '^client_sha1=' mc-fetch.log | cut -d= -f2 > client.sha1
+
+      - name: Check the client jar against Horizon's research-lock.json
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          want = open("client.sha1").read().strip()
+          lock = json.load(open("horizon/research-lock.json"))
+          found = []
+          def walk(o):
+              if isinstance(o, dict):
+                  for k, v in o.items():
+                      if k == "client_sha1": found.append(v)
+                      else: walk(v)
+              elif isinstance(o, list):
+                  for v in o: walk(v)
+          walk(lock)
+          if not found:
+              print("::warning::research-lock.json has no client_sha1 key; relying on horizon-prepare's own check")
+          elif want not in found:
+              sys.exit(f"client jar SHA-1 {want} does not match research-lock.json {found}")
+          else:
+              print("client jar matches research-lock.json:", want)
+          PY
+
+      - name: horizon-prepare --help (records the real CLI so validation commands can be chosen)
+        working-directory: horizon
+        run: cargo run --release -p horizon-prepare -- --help 2>&1 | tee ../prepare-help.txt
+
+      - name: horizon-prepare --prepare (Horizon's own tool, JDK 25)
+        working-directory: horizon
+        env:
+          HORIZON_SERVER_JAR: ${{ runner.temp }}/server.jar
+        run: |
+          export HORIZON_MINECRAFT_DIR="$HOME/.minecraft"
+          cargo run --release -p horizon-prepare -- --prepare --server-jar "$HORIZON_SERVER_JAR" 2>&1 | tee ../prepare.log
+
+      - name: Pack horizon-derived.zip (Horizon's own script)
+        working-directory: horizon
+        run: |
+          bash packaging/android/make_derived_pack.sh 2>&1 | tee ../pack.log
+          ls -l target/android/horizon-derived.zip
+
+      - name: Validate (integrity, marker file, size sanity)
+        working-directory: horizon
+        run: |
+          set -e
+          Z=target/android/horizon-derived.zip
+          unzip -tq "$Z"
+          SIZE=$(stat -c %s "$Z")
+          echo "zip size: $SIZE bytes"
+          [ "$SIZE" -gt 1000000 ] || { echo "::error::derived zip is suspiciously small"; exit 1; }
+          M=.local/horizon-client/${{ inputs.mc_version }}/horizon-resources.json
+          [ -f "$M" ] && python3 -c "import json,sys; json.load(open('$M')); print('horizon-resources.json: valid JSON')" || { echo "::error::finished-preparation marker missing or invalid"; exit 1; }
+          sha256sum "$Z" | tee ../derived.sha256
+          { echo "# Derived pack report"; echo; echo "- horizon source: $(git rev-parse HEAD)"; echo "- minecraft: ${{ inputs.mc_version }}";
+            echo "- zip bytes: $SIZE"; echo "- sha256: $(cut -d' ' -f1 ../derived.sha256)";
+            echo; echo "## horizon-prepare --help"; sed 's/^/    /' ../prepare-help.txt;
+            echo; echo "## zip entries (name, size)"; unzip -l "$Z" | sed 's/^/    /' | head -300; } > ../DERIVED_REPORT.md
+          echo "NOTE: this validates integrity only. The real acceptance test is the Android app's own installer on a phone (docs/HORIZON_STANDALONE_TEST_PLAN.md)."
+
+      - name: Optional encryption (set repo secret DERIVED_PACK_PASSPHRASE)
+        env:
+          PASS: ${{ secrets.DERIVED_PACK_PASSPHRASE }}
+        run: |
+          mkdir -p out
+          cp horizon/target/android/horizon-derived.zip out/
+          if [ -n "$PASS" ]; then
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric --cipher-algo AES256 -o out/horizon-derived.zip.gpg out/horizon-derived.zip
+            rm out/horizon-derived.zip
+            echo "encrypted with the repository secret"
+          else
+            echo "no passphrase secret set: artifact is stored unencrypted (private repository only)"
+          fi
+
+      - name: Upload derived pack (private, short retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: horizon-derived-pack-PRIVATE
+          path: out/
+          retention-days: 2
+
+      - name: Upload report (contains no game data)
+        uses: actions/upload-artifact@v4
+        with:
+          name: horizon-derived-report
+          path: |
+            DERIVED_REPORT.md
+            derived.sha256
+            prepare.log
+            pack.log
+            mc-fetch.log
+            prepare-help.txt
+          retention-days: 14
