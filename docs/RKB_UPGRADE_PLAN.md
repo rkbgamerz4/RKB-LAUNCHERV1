@@ -27,7 +27,7 @@ Branch chain (nothing touches `main`): `feature/horizon-engine` -> `feature/rkb-
 | 1 plan | this document |
 | 2 Horizon | blocked on standalone verification (workflows exist, not run) |
 | 3 Pojav controls | layout import/export exists; runtime replacement not started |
-| 4 Instances (your reference) | **built, uncompiled**: card grid, search, loader filter, create, select, PLAY, Edit, Rename/Copy/Export/Delete (existing confirmation dialogs). No Horizon card unless a Horizon app is installed; no modpack mode yet |
+| 4 Instances (your reference) | **built, uncompiled**: permanent card library of every installed instance of the current game folder (drawn banner, icon+name, Installed/Needs repair, loader, Minecraft version, PLAY on the selected one, Edit, More = Rename/Copy/Export/Delete with the existing confirmation), search, loader filter. Modpack instances (marker written only after a successful modpack install) open a modpack-only dialog. Horizon: no card until the engine is verified |
 | 5 Downloads | waiting for your Download reference |
 | 6 polish | the Download-screen bug list needs screenshots of the glitches |
 | 7 CI APK | existing `rkb-debug.yml` / `rkb-release.yml` |

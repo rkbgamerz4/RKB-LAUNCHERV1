@@ -50,7 +50,9 @@ import com.movtery.zalithlauncher.game.version.installed.VersionComparator
 import com.movtery.zalithlauncher.game.version.installed.VersionType
 import com.movtery.zalithlauncher.game.version.installed.VersionsManager
 import com.movtery.zalithlauncher.ui.base.BaseScreen
+import com.movtery.zalithlauncher.ui.screens.NestedNavKey
 import com.movtery.zalithlauncher.ui.screens.NormalNavKey
+import com.movtery.zalithlauncher.game.version.installed.RkbModpackMetaStore
 import com.movtery.zalithlauncher.ui.screens.content.elements.CommonVersionInfoLayout
 import com.movtery.zalithlauncher.ui.screens.content.elements.VersionsOperation
 import com.movtery.zalithlauncher.viewmodel.ErrorViewModel
@@ -192,6 +194,11 @@ fun RkbInstancesScreen(
                                 },
                                 onPlay = { onPlay(version) },
                                 onEdit = { navigateToVersions(version) },
+                                onMods = {
+                                    val settingsKey = NestedNavKey.VersionSettings(version)
+                                    settingsKey.navigateTo(NormalNavKey.Versions.ModsManager)
+                                    backScreenViewModel.mainScreen.navigateTo(settingsKey, useClassEquality = true)
+                                },
                                 onRename = { operation = VersionsOperation.Rename(version) },
                                 onCopy = { operation = VersionsOperation.Copy(version) },
                                 onExport = { navigateToExport(version) },
@@ -276,12 +283,15 @@ private fun RkbInstanceCard(
     onSelect: () -> Unit,
     onPlay: () -> Unit,
     onEdit: () -> Unit,
+    onMods: () -> Unit,
     onRename: () -> Unit,
     onCopy: () -> Unit,
     onExport: () -> Unit,
     onDelete: () -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
+    val modpack = remember(version) { RkbModpackMetaStore.read(version) }
+    var modpackOpen by remember { mutableStateOf(false) }
     val valid = remember(version) { version.isValid() }
     val info = remember(version) { version.getVersionInfo() }
     val loaderText = remember(version) {
@@ -296,7 +306,9 @@ private fun RkbInstanceCard(
         color = scheme.surfaceContainerHigh,
         border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) scheme.primary else scheme.outlineVariant)
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column {
+            RkbInstanceBanner(seedText = version.getVersionName(), loader = if (modpack != null) "modpack" else loaderText)
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (selected) {
                 Text("SELECTED", style = MaterialTheme.typography.labelSmall, color = scheme.primary)
             }
@@ -338,14 +350,14 @@ private fun RkbInstanceCard(
                     }
                 }
                 OutlinedButton(
-                    onClick = onEdit,
+                    onClick = { if (modpack != null) modpackOpen = true else onEdit() },
                     enabled = valid,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Icon(painterResource(R.drawable.ic_edit_filled), null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Edit")
+                    Text(if (modpack != null) "Open" else "Edit")
                 }
                 Box {
                     OutlinedButton(
@@ -367,6 +379,53 @@ private fun RkbInstanceCard(
                     }
                 }
             }
+            }
         }
     }
+    if (modpackOpen && modpack != null) {
+        RkbModpackInstanceDialog(
+            version = version, meta = modpack,
+            onDismiss = { modpackOpen = false },
+            onPlay = { modpackOpen = false; onPlay() },
+            onMods = { modpackOpen = false; onMods() },
+            onExport = { modpackOpen = false; onExport() },
+            onRename = { modpackOpen = false; onRename() },
+            onDelete = { modpackOpen = false; onDelete() }
+        )
+    }
+}
+
+/**
+ * Opened from a modpack instance: modpack information and modpack actions only. No version downloads, no loader browsing,
+ * no world downloads and no instance creation here.
+ */
+@Composable
+private fun RkbModpackInstanceDialog(
+    version: Version,
+    meta: com.movtery.zalithlauncher.game.version.installed.RkbModpackMeta,
+    onDismiss: () -> Unit,
+    onPlay: () -> Unit,
+    onMods: () -> Unit,
+    onExport: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text(meta.name.ifBlank { version.getVersionName() }) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Source: " + meta.platform.ifBlank { "-" })
+                Text("Minecraft: " + meta.minecraft.ifBlank { "-" })
+                Text("Loader: " + meta.loaders.ifBlank { "-" })
+                Spacer(Modifier.height(4.dp))
+                Button(onClick = onPlay, modifier = Modifier.fillMaxWidth()) { Text("PLAY") }
+                OutlinedButton(onClick = onMods, modifier = Modifier.fillMaxWidth()) { Text("Mods in this modpack") }
+                OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth()) { Text("Export") }
+                OutlinedButton(onClick = onRename, modifier = Modifier.fillMaxWidth()) { Text("Rename") }
+                OutlinedButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) { Text("Delete") }
+            }
+        }
+    )
 }
