@@ -91,7 +91,7 @@ jobs:
           cp /tmp/apk/lib/arm64-v8a/*.so ../engine-out/ 2>/dev/null
           {
             echo "# Horizon engine build report"
-            echo "- source: Rayan-XOO/horizon @ $SOURCE_SHA (ref: ${{ inputs.ref || 'fc3e4d395016ae7210d1f54da5a09c0b2763b9ea' }}, profile: ${{ inputs.profile }})"
+            echo "- source: Rayan-XOO/horizon @ $SOURCE_SHA (ref: ${{ inputs.ref || 'fc3e4d395016ae7210d1f54da5a09c0b2763b9ea' }}, profile: ${{ inputs.profile || 'release' }})"
             echo "- rustc: $(rustc --version)"
             echo "- NDK: 27.2.12479018, API 26, arm64-v8a"
             echo; echo "## Files"; (cd ../engine-out && sha256sum * | sed 's/^/    /'; ls -l | sed 's/^/    /')
