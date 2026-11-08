@@ -1,0 +1,89 @@
+name: RKB Rust Edition Android Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'rust/**'
+      - 'app_pojavlauncher/**'
+      - 'gradle/**'
+      - '*.gradle'
+      - '*.gradle.kts'
+      - '.github/workflows/rust-edition-android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rkb-rust-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Rust + Android APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;27.2.12479018"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build Rust ARM64 and ARMv7
+        if: hashFiles('rust/Cargo.toml') != ''
+        working-directory: rust
+        run: |
+          cargo ndk -t arm64-v8a \
+            -o ../app_pojavlauncher/src/main/jniLibs \
+            build --release
+
+          cargo ndk -t armeabi-v7a \
+            -o ../app_pojavlauncher/src/main/jniLibs \
+            build --release
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app_pojavlauncher:assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RKB-Rust-Edition-APK
+          path: app_pojavlauncher/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Rust Libraries
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RKB-Rust-Android-Libraries
+          path: app_pojavlauncher/src/main/jniLibs/**/*.so
+          if-no-files-found: warn
+          retention-days: 14
