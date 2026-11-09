@@ -1,0 +1,172 @@
+
+name: RKB Rust Edition Android Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'rust/**'
+      - 'app_pojavlauncher/**'
+      - 'gradle/**'
+      - '*.gradle'
+      - '*.gradle.kts'
+      - 'gradlew'
+      - '.github/workflows/rust-edition-android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rkb-rust-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Rust + Android APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    env:
+      ANDROID_HOME: ${{ runner.temp }}/android-sdk
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+      NDK_VERSION: 27.2.12479018
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust -> target
+
+      - name: Install Android SDK Command Line Tools
+        run: |
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+
+          curl -fL \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+            -o "$RUNNER_TEMP/cmdline-tools.zip"
+
+          mkdir -p "$RUNNER_TEMP/android-cmdline"
+          unzip -q "$RUNNER_TEMP/cmdline-tools.zip" -d "$RUNNER_TEMP/android-cmdline"
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          cp -a "$RUNNER_TEMP/android-cmdline/cmdline-tools/." \
+            "$ANDROID_HOME/cmdline-tools/latest/"
+
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses || true
+
+      - name: Install Android SDK Packages
+        run: |
+          sdkmanager --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;$NDK_VERSION"
+
+      - name: Configure Android NDK
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Verify Android SDK
+        run: |
+          sdkmanager --sdk_root="$ANDROID_HOME" --list_installed
+          test -d "$ANDROID_HOME/ndk/$NDK_VERSION"
+          test -d "$ANDROID_HOME/platform-tools"
+
+      - name: Install cargo-ndk
+        run: |
+          cargo install cargo-ndk --locked
+
+      - name: Check Rust Project
+        id: rust_check
+        shell: bash
+        run: |
+          if [ -f rust/Cargo.toml ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No rust/Cargo.toml found. Rust build will be skipped."
+          fi
+
+      - name: Build Rust ARM64
+        if: steps.rust_check.outputs.available == 'true'
+        working-directory: rust
+        run: |
+          cargo ndk -t arm64-v8a \
+            -o ../app_pojavlauncher/src/main/jniLibs \
+            build --release
+
+      - name: Build Rust ARMv7
+        if: steps.rust_check.outputs.available == 'true'
+        working-directory: rust
+        run: |
+          cargo ndk -t armeabi-v7a \
+            -o ../app_pojavlauncher/src/main/jniLibs \
+            build --release
+
+      - name: Verify Rust Libraries
+        if: steps.rust_check.outputs.available == 'true'
+        run: |
+          find app_pojavlauncher/src/main/jniLibs -name "*.so" -type f
+          test -n "$(find app_pojavlauncher/src/main/jniLibs -name '*.so' -type f -print -quit)"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate Gradle Wrapper
+        run: |
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Build Android Debug APK
+        run: |
+          ./gradlew :app_pojavlauncher:assembleDebug \
+            --no-daemon \
+            --stacktrace
+
+      - name: Verify APK
+        run: |
+          APK_PATH="app_pojavlauncher/build/outputs/apk/debug"
+          find "$APK_PATH" -name "*.apk" -type f
+          test -n "$(find "$APK_PATH" -name '*.apk' -type f -print -quit)"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RKB-Rust-Edition-APK
+          path: app_pojavlauncher/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Rust Libraries
+        if: steps.rust_check.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RKB-Rust-Android-Libraries
+          path: app_pojavlauncher/src/main/jniLibs/**/*.so
+          if-no-files-found: error
+          retention-days: 14
