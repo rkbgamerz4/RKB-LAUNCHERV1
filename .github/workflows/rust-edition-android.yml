@@ -1,3 +1,4 @@
+
 name: RKB Rust Edition Android Build
 
 on:
@@ -44,6 +45,19 @@ jobs:
           echo "ANDROID_HOME=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
 
+      - name: Verify Rust Source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f rust/Cargo.toml ]; then
+            echo "::error::Rust source is missing: rust/Cargo.toml"
+            echo "Add the actual Rust project before running this workflow."
+            exit 1
+          fi
+
+          echo "Rust project found."
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -55,19 +69,7 @@ jobs:
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
 
-      - name: Check Rust Project
-        id: rust_check
-        shell: bash
-        run: |
-          if [ -f rust/Cargo.toml ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "No rust/Cargo.toml found."
-          fi
-
       - name: Cache Rust
-        if: steps.rust_check.outputs.available == 'true'
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -101,7 +103,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Ignore the expected yes-command Broken pipe,
+          # but preserve sdkmanager's actual exit status.
+          set +e
+          set +o pipefail
           yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+          STATUS=$?
+          set -e
+          set -o pipefail
+
+          exit "$STATUS"
 
       - name: Install Android SDK Packages
         shell: bash
@@ -125,19 +137,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          sdkmanager --sdk_root="$ANDROID_HOME" --list_installed
-
           test -d "$ANDROID_HOME/ndk/$NDK_VERSION"
           test -d "$ANDROID_HOME/platform-tools"
+
+          sdkmanager --sdk_root="$ANDROID_HOME" --list_installed
 
           echo "Android SDK setup successful."
 
       - name: Install cargo-ndk
-        if: steps.rust_check.outputs.available == 'true'
         run: cargo install cargo-ndk --locked
 
       - name: Build Rust ARM64
-        if: steps.rust_check.outputs.available == 'true'
         working-directory: rust
         run: |
           cargo ndk -t arm64-v8a \
@@ -145,7 +155,6 @@ jobs:
             build --release
 
       - name: Build Rust ARMv7
-        if: steps.rust_check.outputs.available == 'true'
         working-directory: rust
         run: |
           cargo ndk -t armeabi-v7a \
@@ -153,7 +162,6 @@ jobs:
             build --release
 
       - name: Verify Rust Libraries
-        if: steps.rust_check.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -199,10 +207,10 @@ jobs:
           retention-days: 14
 
       - name: Upload Rust Libraries
-        if: steps.rust_check.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: RKB-Rust-Android-Libraries
           path: app_pojavlauncher/src/main/jniLibs/**/*.so
           if-no-files-found: error
           retention-days: 14
+          
