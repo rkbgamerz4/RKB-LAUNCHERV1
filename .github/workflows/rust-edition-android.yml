@@ -1,9 +1,10 @@
-
 name: RKB Rust Edition Android Build
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - rkb-bundle-import
     paths:
       - 'rust/**'
       - 'app_pojavlauncher/**'
@@ -27,8 +28,6 @@ jobs:
     timeout-minutes: 90
 
     env:
-      ANDROID_HOME: ${{ runner.temp }}/android-sdk
-      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
       NDK_VERSION: 27.2.12479018
       CARGO_TERM_COLOR: always
       CARGO_INCREMENTAL: 0
@@ -38,6 +37,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Configure Android SDK Paths
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -50,57 +55,6 @@ jobs:
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            rust -> target
-
-      - name: Install Android SDK Command Line Tools
-        run: |
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-
-          curl -fL \
-            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
-            -o "$RUNNER_TEMP/cmdline-tools.zip"
-
-          mkdir -p "$RUNNER_TEMP/android-cmdline"
-          unzip -q "$RUNNER_TEMP/cmdline-tools.zip" -d "$RUNNER_TEMP/android-cmdline"
-
-          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-          cp -a "$RUNNER_TEMP/android-cmdline/cmdline-tools/." \
-            "$ANDROID_HOME/cmdline-tools/latest/"
-
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-
-      - name: Accept Android SDK Licenses
-        run: |
-          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses || true
-
-      - name: Install Android SDK Packages
-        run: |
-          sdkmanager --sdk_root="$ANDROID_HOME" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "ndk;$NDK_VERSION"
-
-      - name: Configure Android NDK
-        run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
-
-      - name: Verify Android SDK
-        run: |
-          sdkmanager --sdk_root="$ANDROID_HOME" --list_installed
-          test -d "$ANDROID_HOME/ndk/$NDK_VERSION"
-          test -d "$ANDROID_HOME/platform-tools"
-
-      - name: Install cargo-ndk
-        run: |
-          cargo install cargo-ndk --locked
-
       - name: Check Rust Project
         id: rust_check
         shell: bash
@@ -109,8 +63,78 @@ jobs:
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "No rust/Cargo.toml found. Rust build will be skipped."
+            echo "No rust/Cargo.toml found."
           fi
+
+      - name: Cache Rust
+        if: steps.rust_check.outputs.available == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust -> target
+
+      - name: Install Android SDK Command Line Tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDK="$ANDROID_HOME"
+          mkdir -p "$SDK/cmdline-tools"
+          mkdir -p "$RUNNER_TEMP/android-cmdline"
+
+          curl -fL \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+            -o "$RUNNER_TEMP/cmdline-tools.zip"
+
+          unzip -q "$RUNNER_TEMP/cmdline-tools.zip" \
+            -d "$RUNNER_TEMP/android-cmdline"
+
+          mkdir -p "$SDK/cmdline-tools/latest"
+
+          cp -a "$RUNNER_TEMP/android-cmdline/cmdline-tools/." \
+            "$SDK/cmdline-tools/latest/"
+
+          echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Accept Android SDK Licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+
+      - name: Install Android SDK Packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;$NDK_VERSION"
+
+      - name: Configure Android NDK
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Verify Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager --sdk_root="$ANDROID_HOME" --list_installed
+
+          test -d "$ANDROID_HOME/ndk/$NDK_VERSION"
+          test -d "$ANDROID_HOME/platform-tools"
+
+          echo "Android SDK setup successful."
+
+      - name: Install cargo-ndk
+        if: steps.rust_check.outputs.available == 'true'
+        run: cargo install cargo-ndk --locked
 
       - name: Build Rust ARM64
         if: steps.rust_check.outputs.available == 'true'
@@ -130,9 +154,15 @@ jobs:
 
       - name: Verify Rust Libraries
         if: steps.rust_check.outputs.available == 'true'
+        shell: bash
         run: |
-          find app_pojavlauncher/src/main/jniLibs -name "*.so" -type f
-          test -n "$(find app_pojavlauncher/src/main/jniLibs -name '*.so' -type f -print -quit)"
+          set -euo pipefail
+
+          find app_pojavlauncher/src/main/jniLibs \
+            -type f -name "*.so"
+
+          test -n "$(find app_pojavlauncher/src/main/jniLibs \
+            -type f -name '*.so' -print -quit)"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -149,10 +179,16 @@ jobs:
             --stacktrace
 
       - name: Verify APK
+        shell: bash
         run: |
+          set -euo pipefail
+
           APK_PATH="app_pojavlauncher/build/outputs/apk/debug"
-          find "$APK_PATH" -name "*.apk" -type f
-          test -n "$(find "$APK_PATH" -name '*.apk' -type f -print -quit)"
+
+          find "$APK_PATH" -type f -name "*.apk"
+
+          test -n "$(find "$APK_PATH" \
+            -type f -name '*.apk' -print -quit)"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
