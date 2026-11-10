@@ -1,159 +1,70 @@
-name: Build RKB Launcher APK
+name: RKB Launcher APK Build
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches:
+      - rkb-complete-source-import-20261110-1607
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build RKB Launcher
     runs-on: ubuntu-22.04
+    timeout-minutes: 120
 
     steps:
-      - name: Checkout
+      - name: Checkout RKB source
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Set up JDK 21
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: '21'
 
-      - name: Download LTW
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK and NDK
         run: |
-          mkdir -p app_pojavlauncher/libs
-          wget -q -O app_pojavlauncher/libs/ltw-release.aar \
-            https://github.com/PojavLauncherTeam/LTW/releases/latest/download/ltw-release.aar || true
-
-      - name: Download JRE 8
-        uses: dawidd6/action-download-artifact@v6
-        continue-on-error: true
-        with:
-          workflow: build.yml
-          path: app_pojavlauncher/src/main/assets/components/jre
-          workflow_conclusion: success
-          repo: PojavLauncherTeam/android-openjdk-build-multiarch
-          branch: buildjre8
-          name: jre8-pojav
-
-      - name: Download JRE 17
-        uses: dawidd6/action-download-artifact@v6
-        continue-on-error: true
-        with:
-          workflow: build.yml
-          path: app_pojavlauncher/src/main/assets/components/jre-new
-          workflow_conclusion: success
-          repo: PojavLauncherTeam/android-openjdk-build-multiarch
-          branch: buildjre17-21
-          name: jre17-pojav
-
-      - name: Download JRE 21
-        uses: dawidd6/action-download-artifact@v6
-        continue-on-error: true
-        with:
-          workflow: build.yml
-          path: app_pojavlauncher/src/main/assets/components/jre-21
-          workflow_conclusion: success
-          repo: PojavLauncherTeam/android-openjdk-build-multiarch
-          branch: buildjre17-21
-          name: jre21-pojav
-
-      - name: Verify bundled Java runtimes
-        # The three downloads above are allowed to fail so the job continues, but an APK built
-        # without them cannot run Minecraft. Say so loudly instead of shipping a silent runtime-less APK.
-        run: |
-          missing=0
-          for d in jre jre-new jre-21; do
-            p=app_pojavlauncher/src/main/assets/components/$d
-            if [ -f "$p/version" ] && [ -f "$p/universal.tar.xz" ]; then
-              echo "OK      $d  (version $(cat $p/version))"
-            else
-              echo "::error::Java runtime '$d' is missing in the APK assets ($p). The upstream artifact download failed or expired."
-              missing=1
-            fi
-          done
-          if [ "$missing" = "1" ]; then
-            echo "::warning::Building anyway; the app will only run Java versions installed from a .tar.xz in Settings > Java."
-          fi
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-37.2" \
+            "ndk;25.2.9519653" \
+            "cmake;3.22.1"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build helper JARs
+      - name: Verify Gradle projects
         run: |
-          chmod +x gradlew scripts/*.sh 2>/dev/null || true
-          ./gradlew :jre_lwjgl3glfw:build :arc_dns_injector:jar :forge_installer:jar --no-daemon || \
-          ./gradlew :jre_lwjgl3glfw:build --no-daemon
+          chmod +x gradlew
+          ./gradlew projects --no-daemon
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Remove old debug keystore
+      - name: Build RKB Launcher ARM64 APK
         run: |
-          rm -f app_pojavlauncher/debug.keystore
-          rm -f app_pojavlauncher/debug.keystore.bak
-
-      - name: Generate debug keystore
-        run: |
-          keytool -genkeypair \
-            -v \
-            -keystore app_pojavlauncher/debug.keystore \
-            -storetype JKS \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass androiddebugkey \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
-
-      - name: Verify debug keystore
-        run: |
-          echo "=== Keystore ==="
-          file app_pojavlauncher/debug.keystore
-          ls -lh app_pojavlauncher/debug.keystore
-
-          echo "=== Key list ==="
-          keytool -list \
-            -keystore app_pojavlauncher/debug.keystore \
-            -storetype JKS \
-            -storepass android
-
-          echo "=== Key verification ==="
-          keytool -list \
-            -keystore app_pojavlauncher/debug.keystore \
-            -storetype JKS \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass androiddebugkey
-
-      - name: Clean Gradle build
-        run: |
-          ./gradlew :app_pojavlauncher:clean --no-daemon
-
-      - name: Build Debug APK
-        run: |
-          mkdir -p out
-
-          ./gradlew \
-            :app_pojavlauncher:assembleDebug \
+          ./gradlew :ZalithLauncher:assembleDebug \
+            -Darch=arm64 \
             --no-daemon \
-            --no-build-cache
-
-          cp app_pojavlauncher/build/outputs/apk/debug/*.apk \
-            out/RKBLauncher-debug.apk
+            --stacktrace
 
       - name: Verify APK
         run: |
-          ls -lh out/RKBLauncher-debug.apk
-          file out/RKBLauncher-debug.apk
+          find ZalithLauncher/build/outputs/apk/debug \
+            -type f -name "*.apk" -print
+          test -n "$(find ZalithLauncher/build/outputs/apk/debug \
+            -type f -name '*.apk' -print -quit)"
 
-      - name: Upload APK
+      - name: Upload RKB Launcher APK
         uses: actions/upload-artifact@v4
         with:
-          name: RKBLauncher-debug
-          path: out/RKBLauncher-debug.apk
+          name: RKB-LAUNCHER-ARM64-APK
+          path: ZalithLauncher/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 14
