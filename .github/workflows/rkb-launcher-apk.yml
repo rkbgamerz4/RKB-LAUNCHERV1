@@ -1,0 +1,52 @@
+name: RKB Launcher APK Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build RKB Launcher APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout RKB source
+        uses: actions/checkout@v4
+        with:
+          ref: rkb-complete-source-import-20261110-1607
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-37"
+
+      - name: Build RKB Launcher
+        run: |
+          chmod +x gradlew
+          ./gradlew :ZalithLauncher:assembleDebug --no-daemon --stacktrace
+
+      - name: Verify APK
+        run: |
+          find ZalithLauncher/build/outputs/apk -name "*.apk"
+          test -n "$(find ZalithLauncher/build/outputs/apk -name '*.apk' -print -quit)"
+
+      - name: Upload RKB APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RKB-LAUNCHER-APK
+          path: ZalithLauncher/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
