@@ -597,7 +597,14 @@ private fun NavigationUI(
                         backScreenViewModel = screenBackStackModel,
                         navigateToVersions = navigateToVersions,
                         navigateToExport = navigateToExport,
-                        submitError = submitError
+                        submitError = submitError,
+                        onPlay = { target ->
+                            // same launch path as the Home PLAY button (normal Java pipeline)
+                            if (target.isValid()) {
+                                com.movtery.zalithlauncher.utils.RkbDiscord.setPlaying(target.getVersionName())
+                                eventViewModel.sendEvent(EventViewModel.Event.Launch.Game(target))
+                            }
+                        }
                     )
                 }
                 entry<NormalNavKey.FileSelector> { key ->

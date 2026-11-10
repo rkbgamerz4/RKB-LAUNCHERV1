@@ -56,7 +56,7 @@ import com.movtery.zalithlauncher.ui.screens.NormalNavKey
 import com.movtery.zalithlauncher.ui.screens.TitledNavKey
 import com.movtery.zalithlauncher.ui.screens.content.elements.CategoryIcon
 import com.movtery.zalithlauncher.ui.screens.content.elements.CategoryItem
-import com.movtery.zalithlauncher.ui.screens.content.settings.AboutInfoScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.RkbAboutScreen
 import com.movtery.zalithlauncher.ui.screens.content.settings.ControlManageScreen
 import com.movtery.zalithlauncher.ui.screens.content.settings.ControlSettingsScreen
 import com.movtery.zalithlauncher.ui.screens.content.settings.GameSettingsScreen
@@ -243,13 +243,10 @@ private fun NavigationUI(
                     ControlManageScreen(key, settingsScreenKey, mainScreenKey, eventViewModel, submitError)
                 }
                 entry<NormalNavKey.Settings.AboutInfo> {
-                    AboutInfoScreen(
+                    RkbAboutScreen(
                         key = key,
                         settingsScreenKey = settingsScreenKey,
                         mainScreenKey = mainScreenKey,
-                        checkUpdate = {
-                            eventViewModel.sendEvent(EventViewModel.Event.CheckUpdate)
-                        },
                         openLicense = openLicenseScreen,
                         openLink = { url ->
                             eventViewModel.sendEvent(EventViewModel.Event.OpenLink(url))

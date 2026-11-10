@@ -76,3 +76,8 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - Instance Download hub (3 category cards: Normal Versions / Modpack / Rust Edition), landscape row + portrait column. Normal hides the Modpack tab; Modpack shows no tab row.
 - Modpack browser: split layout (results left, versions of the selected pack right) reusing the existing Modrinth/CurseForge search, version list and installer.
 - Rust Edition: verified compatibility panel + external-app launch of the unofficial Android port; Horizon card in Instances. See HORIZON_INTEGRATION.md.
+
+## Batch 12: About page, complete-source ZIP (uncompiled)
+- Old inherited About page removed from the UI (the file `AboutInfoScreen.kt` is kept in the tree but no longer referenced); new `RkbAboutScreen` shows logo, description, developer RKB GAMERZ, version read from the app, Java engine info (bundled runtimes and active renderer read at runtime), Rust Edition status (not integrated), the three official links in the required order, credits and the existing library/license list.
+- Signing: the RKB debug key file is optional; without it Gradle falls back to Android's standard debug key.
+- Rust Edition is NOT integrated: see docs/HORIZON_ENGINE_PLAN.md and docs/HORIZON_STANDALONE_TEST_PLAN.md.

@@ -30,6 +30,7 @@ import com.movtery.zalithlauncher.game.download.game.GameDownloadInfo
 import com.movtery.zalithlauncher.game.download.game.GameInstaller
 import com.movtery.zalithlauncher.game.download.modpack.platform.AbstractPack
 import com.movtery.zalithlauncher.game.download.modpack.platform.PackPlatform
+import com.movtery.zalithlauncher.game.version.installed.RkbModpackMetaStore
 import com.movtery.zalithlauncher.game.version.installed.VersionConfig
 import com.movtery.zalithlauncher.ui.androidText
 import com.movtery.zalithlauncher.utils.file.copyDirectoryContents
@@ -186,6 +187,15 @@ abstract class ModPackInfoTask(
                 this.versionSummary = modpackInfo.summary ?: "" //整合包描述
                 this.ramAllocation = modpackInfo.ram ?: -1
             }.save()
+
+            //RKB: mark this instance as a modpack instance (only reached after all downloads and the copy succeeded)
+            RkbModpackMetaStore.write(
+                versionFolder = targetClientDir,
+                name = modpackInfo.name,
+                platform = platform.identifier,
+                minecraft = modpackInfo.gameVersion,
+                loaders = modpackInfo.loaders.joinToString(" + ") { it.first.displayName + " " + it.second }
+            )
 
             //清理临时整合包目录
             task.updateProgress(-1f)
