@@ -174,7 +174,7 @@ object ControlManager {
     }
 
     /** Converts the bundled Pojav default layout for this screen and saves it as a new layout file. */
-    private fun importBundledPojavDefault(context: Context): File {
+    private suspend fun importBundledPojavDefault(context: Context): File {
         val json = context.assets.open("pojav_default_layout.json").bufferedReader().use { it.readText() }
         val dm = Resources.getSystem().displayMetrics
         val result = PojavLayoutConverter.importPojav(
