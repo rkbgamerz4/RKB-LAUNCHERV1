@@ -30,6 +30,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import com.movtery.zalithlauncher.ui.screens.content.RkbInstancesScreen
 import com.movtery.zalithlauncher.ui.screens.content.RkbSettingsHub
+import com.movtery.zalithlauncher.ui.screens.content.RkbDownloadHub
 import com.movtery.zalithlauncher.ui.screens.content.RkbHomeScreen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -373,7 +374,13 @@ private fun <E: TitledNavKey> TopBar(
                 }
             }
             val parentRes = mainScreenKey?.title
-            val childRes = (mainScreenKey as? BackStackNavKey<*>)?.currentKey?.title
+            val childRes = if (mainScreenKey is NestedNavKey.Download &&
+                (RkbDownloadHub.page == RkbDownloadHub.Page.Hub || RkbDownloadHub.page == RkbDownloadHub.Page.Rust)
+            ) {
+                null
+            } else {
+                (mainScreenKey as? BackStackNavKey<*>)?.currentKey?.title
+            }
 
             Crossfade(
                 modifier = Modifier.constrainAs(title) {

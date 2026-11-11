@@ -1,11 +1,9 @@
 /*
- * RKB LAUNCHER - "Instance Download" category hub: Normal Versions / Modpack / Rust Edition.
- * The three categories are kept separate; each opens its own existing or dedicated flow.
+ * RKB LAUNCHER - "Instance Download" category hub: Normal Versions / Modpack / Rust Edition (coming soon).
+ * Compact on purpose: it has to fit a phone in landscape (about 300 dp of height) without clipping.
  */
 package com.movtery.zalithlauncher.ui.screens.content
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,22 +27,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.movtery.zalithlauncher.R
 
@@ -66,47 +60,43 @@ fun RkbDownloadHubScreen(
     onRust: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val appear by animateFloatAsState(if (shown) 1f else 0f, tween(350), label = "hubAppear")
-
     Column(
         modifier = modifier
             .fillMaxSize()
-            .alpha(appear)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Column {
-            Text("INSTANCE DOWNLOAD", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+            Text("INSTANCE DOWNLOAD", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
             Text(
                 "Download and manage Minecraft instances",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1
             )
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             val landscape = maxWidth > maxHeight
             if (landscape) {
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HubCard("NORMAL", "VERSIONS", "Vanilla, Fabric, Forge, NeoForge, Quilt and more", listOf("Vanilla", "Fabric", "Forge", "NeoForge", "Quilt"),
-                        "Browse Versions", Blue, onNormal, Modifier.weight(1f).fillMaxHeight())
-                    HubCard("MOD", "PACK", "Modrinth and CurseForge modpacks, installed as instances", listOf("Modrinth", "CurseForge"),
-                        "Browse Modpacks", Violet, onModpack, Modifier.weight(1f).fillMaxHeight())
-                    HubCard("RUST", "EDITION", "Minecraft 26.3 (Rust Edition) with Horizon", listOf("Horizon", "Native", "Experimental"),
-                        "Browse Horizon", Orange, onRust, Modifier.weight(1f).fillMaxHeight())
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HubCard("NORMAL", "VERSIONS", "Vanilla, Fabric, Forge, NeoForge, Quilt", "Vanilla · Fabric · Forge · NeoForge · Quilt",
+                        "Browse versions", Blue, true, onNormal, Modifier.weight(1f).fillMaxHeight())
+                    HubCard("MOD", "PACK", "Modrinth and CurseForge modpacks, installed as instances", "Modrinth · CurseForge",
+                        "Browse modpacks", Violet, true, onModpack, Modifier.weight(1f).fillMaxHeight())
+                    HubCard("RUST", "EDITION", "Minecraft 26.3 on the Horizon engine", "Horizon · Native",
+                        "Coming soon", Orange, false, onRust, Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
                 Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    HubCard("NORMAL", "VERSIONS", "Vanilla, Fabric, Forge, NeoForge, Quilt and more", listOf("Vanilla", "Fabric", "Forge", "NeoForge", "Quilt"),
-                        "Browse Versions", Blue, onNormal, Modifier.fillMaxWidth())
-                    HubCard("MOD", "PACK", "Modrinth and CurseForge modpacks, installed as instances", listOf("Modrinth", "CurseForge"),
-                        "Browse Modpacks", Violet, onModpack, Modifier.fillMaxWidth())
-                    HubCard("RUST", "EDITION", "Minecraft 26.3 (Rust Edition) with Horizon", listOf("Horizon", "Native", "Experimental"),
-                        "Browse Horizon", Orange, onRust, Modifier.fillMaxWidth())
+                    HubCard("NORMAL", "VERSIONS", "Vanilla, Fabric, Forge, NeoForge, Quilt", "Vanilla · Fabric · Forge · NeoForge · Quilt",
+                        "Browse versions", Blue, true, onNormal, Modifier.fillMaxWidth())
+                    HubCard("MOD", "PACK", "Modrinth and CurseForge modpacks, installed as instances", "Modrinth · CurseForge",
+                        "Browse modpacks", Violet, true, onModpack, Modifier.fillMaxWidth())
+                    HubCard("RUST", "EDITION", "Minecraft 26.3 on the Horizon engine", "Horizon · Native",
+                        "Coming soon", Orange, false, onRust, Modifier.fillMaxWidth())
                 }
             }
         }
@@ -118,79 +108,82 @@ private fun HubCard(
     white: String,
     accentWord: String,
     description: String,
-    chips: List<String>,
+    tags: String,
     button: String,
     accent: Color,
+    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(12.dp)
     Surface(
-        modifier = modifier
-            .drawBehind {
-                // soft glow: a wider translucent stroke behind the border
-                drawRoundRect(
-                    color = accent.copy(alpha = 0.22f),
-                    cornerRadius = CornerRadius(20.dp.toPx()),
-                    style = Stroke(width = 10.dp.toPx())
-                )
-            }
-            .clip(shape)
-            .clickable(onClick = onClick),
+        modifier = modifier.then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
         shape = shape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(2.dp, Brush.verticalGradient(listOf(accent, accent.copy(alpha = 0.35f))))
+        color = scheme.surfaceContainer,
+        border = BorderStroke(if (enabled) 1.5.dp else 1.dp, if (enabled) accent else accent.copy(alpha = 0.4f))
     ) {
         Column(
-            Modifier
-                .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.18f), Color.Transparent)))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                painter = painterResource(
-                    when (accent) {
-                        Blue -> R.drawable.ic_sports_esports_outlined
-                        Violet -> R.drawable.ic_package_2_outlined
-                        else -> R.drawable.ic_settings_filled
-                    }
-                ),
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(52.dp)
-            )
-            Row {
-                Text(white, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                Spacer(Modifier.width(6.dp))
-                Text(accentWord, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = accent)
-            }
-            Text(
-                description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                chips.take(4).forEach { chip ->
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = accent.copy(alpha = 0.15f)
-                    ) {
-                        Text(chip, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
-                    }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(
+                            when (accent) {
+                                Blue -> R.drawable.ic_sports_esports_outlined
+                                Violet -> R.drawable.ic_package_2_outlined
+                                else -> R.drawable.ic_settings_filled
+                            }
+                        ),
+                        contentDescription = null,
+                        tint = if (enabled) accent else accent.copy(alpha = 0.6f),
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = buildAnnotatedString {
+                            append("$white ")
+                            withStyle(SpanStyle(color = accent)) { append(accentWord) }
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    tags,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Spacer(Modifier.weight(1f, fill = false))
+            Spacer(Modifier.height(8.dp))
             Surface(
-                modifier = Modifier.fillMaxWidth().height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = accent
+                modifier = Modifier.fillMaxWidth().height(38.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = if (enabled) accent else scheme.surfaceContainerHigh
             ) {
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Icon(painterResource(R.drawable.ic_download_2_outlined), null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(button, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        button.uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (enabled) Color.White else scheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
                 }
             }
         }

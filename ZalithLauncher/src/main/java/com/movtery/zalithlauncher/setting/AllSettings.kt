@@ -135,6 +135,9 @@ object AllSettings : SettingsRegistry() {
     /** RKB: skip re-hashing game files whose size/mtime are unchanged since their last successful verification. */
     val rkbFastVerify = boolSetting("rkbFastVerify", true)
 
+    /** RKB: set once the bundled PojavLauncher default control layout has been installed and selected. */
+    val rkbPojavDefaultApplied = boolSetting("rkbPojavDefaultApplied", false)
+
     /**
      * 版本自定义信息
      */

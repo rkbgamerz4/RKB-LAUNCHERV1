@@ -84,6 +84,16 @@ object ControlManager {
                 }
             if (files.isEmpty()) {
                 unpackDefaultControl(context)
+                AllSettings.rkbPojavDefaultApplied.save(true)
+            } else if (!AllSettings.rkbPojavDefaultApplied.getValue()) {
+                // RKB: one-time switch to the bundled PojavLauncher default layout; existing layouts stay on disk
+                runCatching {
+                    val file = importBundledPojavDefault(context)
+                    AllSettings.controlLayout.save(file.name)
+                    AllSettings.rkbPojavDefaultApplied.save(true)
+                }.onFailure { e ->
+                    Logger.warning(TAG, "Failed to install the Pojav default control layout", e)
+                }
             }
             refresh()
         }
@@ -150,17 +160,34 @@ object ControlManager {
     }
 
     /**
-     * 解压默认控制布局
+     * RKB: the default layout is the bundled PojavLauncher layout (assets/pojav_default_layout.json), converted
+     * to the layer format on the fly. The inherited Zalith default layout is no longer shipped.
      */
     private suspend fun unpackDefaultControl(
         context: Context
     ) = withContext(Dispatchers.IO) {
         try {
-            val file = getNewRandomFile()
-            context.copyAssetFile(fileName = "default_layout.json", output = file, overwrite = false)
+            importBundledPojavDefault(context)
         } catch (e: Exception) {
             Logger.warning(TAG, "Failed to unpack default control layout", e)
         }
+    }
+
+    /** Converts the bundled Pojav default layout for this screen and saves it as a new layout file. */
+    private fun importBundledPojavDefault(context: Context): File {
+        val json = context.assets.open("pojav_default_layout.json").bufferedReader().use { it.readText() }
+        val dm = Resources.getSystem().displayMetrics
+        val result = PojavLayoutConverter.importPojav(
+            jsonString = json,
+            screenWidthPx = dm.widthPixels,
+            screenHeightPx = dm.heightPixels,
+            density = dm.density,
+            layoutName = "Pojav Default"
+        )
+        result.warnings.forEach { Logger.info(TAG, "Pojav default layout: $it") }
+        val file = getNewRandomFile()
+        result.layout.saveToFile(file)
+        return file
     }
 
     /**
@@ -228,9 +255,10 @@ object ControlManager {
                         screenHeightPx = dm.heightPixels,
                         density = dm.density,
                         layoutName = "Pojav import"
-                    ).layout
+                    ).also { r -> r.warnings.forEach { Logger.info(TAG, "Pojav import: $it") } }.layout
                 } else {
-                    loadLayoutFromString(jsonString)
+                    // RKB supports PojavLauncher control layouts only
+                    throw SerializationException("Only PojavLauncher control layouts (.json with mControlDataList) are supported")
                 }
                 layout.saveToFile(file)
             }

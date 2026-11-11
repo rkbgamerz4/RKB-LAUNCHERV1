@@ -179,9 +179,9 @@ private fun EnginesPanel(renderer: String?, runtimes: List<String>) {
         )
     }
     Panel("Rust Edition (Horizon)") {
-        Text("Optional second engine, not part of this build.", style = MaterialTheme.typography.bodyMedium)
+        Text("Coming soon.", style = MaterialTheme.typography.bodyMedium)
         Text(
-            "Horizon is Minecraft: Java Edition 26.3 rewritten in Rust. It targets 26.3 only, has no Java mod or loader support, and has no official Android release. A separate, unofficial Android port exists; it has not been verified in RKB.",
+            "An optional second engine for Minecraft 26.3 (Horizon) is planned. It is not part of this version.",
             style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
         )
         Text(

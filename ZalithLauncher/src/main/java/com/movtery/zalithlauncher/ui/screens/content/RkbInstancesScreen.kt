@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -74,7 +75,7 @@ fun RkbInstancesScreen(
     val current by VersionsManager.currentVersion.collectAsStateWithLifecycle()
 
     val appContext = androidx.compose.ui.platform.LocalContext.current
-    val horizonVersion = remember { com.movtery.zalithlauncher.utils.RkbHorizon.installedVersion(appContext) }
+    val horizonVersion: String? = null // Rust Edition is on hold
 
     var query by remember { mutableStateOf("") }
     var sort by remember { mutableIntStateOf(0) } // 0 default order, 1 name A-Z, 2 name Z-A
@@ -119,50 +120,38 @@ fun RkbInstancesScreen(
         )
 
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_folder_outlined), null, tint = scheme.primary, modifier = Modifier.size(34.dp))
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("INSTANCES", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Text(
-                        "MANAGE YOUR GAME PROFILES",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.primary
-                    )
-                }
-            }
-
+            // One compact row: title, search, sort, loader filter, create. Fits a phone in landscape.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    placeholder = { Text("Search instances...") }
-                )
+                Icon(painterResource(R.drawable.ic_folder_outlined), null, tint = scheme.primary, modifier = Modifier.size(26.dp))
+                Column {
+                    Text("INSTANCES", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1)
+                    Text("MANAGE YOUR GAME PROFILES", style = MaterialTheme.typography.labelSmall, color = scheme.primary, maxLines = 1)
+                }
+                RkbSearchField(value = query, onValueChange = { query = it }, modifier = Modifier.weight(1f).widthIn(min = 110.dp))
                 RkbDropdown(
-                    label = listOf("Default order", "Name A-Z", "Name Z-A")[sort],
+                    label = listOf("Default", "A-Z", "Z-A")[sort],
                     options = listOf("Default order", "Name A-Z", "Name Z-A").mapIndexed { i, t -> t to { sort = i } }
                 )
                 val loaders = remember {
-                    listOf("All Loaders" to LOADER_ALL, "Vanilla" to LOADER_VANILLA) +
+                    listOf("All" to LOADER_ALL, "Vanilla" to LOADER_VANILLA) +
                         ModLoader.entries.filter { it.isLoader }.map { it.displayName to it.name }
                 }
                 RkbDropdown(
-                    label = loaders.firstOrNull { it.second == loaderChoice }?.first ?: "All Loaders",
+                    label = loaders.firstOrNull { it.second == loaderChoice }?.first ?: "All",
                     options = loaders.map { (name, id) -> name to { loaderChoice = id } }
                 )
                 Button(
                     onClick = { backScreenViewModel.navigateToDownload() },
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)
                 ) {
-                    Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("CREATE INSTANCE")
+                    Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Create", maxLines = 1)
                 }
             }
 
@@ -236,8 +225,13 @@ fun RkbInstancesScreen(
 private fun RkbDropdown(label: String, options: List<Pair<String, () -> Unit>>) {
     var open by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { open = true }, shape = RoundedCornerShape(14.dp)) {
-            Text(label, maxLines = 1)
+        OutlinedButton(
+            onClick = { open = true },
+            modifier = Modifier.height(40.dp),
+            shape = RoundedCornerShape(10.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp)
+        ) {
+            Text(label, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.width(4.dp))
             Icon(painterResource(R.drawable.ic_keyboard_arrow_down), null, modifier = Modifier.size(18.dp))
         }
@@ -290,6 +284,7 @@ private fun RkbInstanceCard(
     onDelete: () -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 420
     val modpack = remember(version) { RkbModpackMetaStore.read(version) }
     var modpackOpen by remember { mutableStateOf(false) }
     val valid = remember(version) { version.isValid() }
@@ -307,8 +302,8 @@ private fun RkbInstanceCard(
         border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) scheme.primary else scheme.outlineVariant)
     ) {
         Column {
-            RkbInstanceBanner(seedText = version.getVersionName(), loader = if (modpack != null) "modpack" else loaderText)
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            RkbInstanceBanner(seedText = version.getVersionName(), loader = if (modpack != null) "modpack" else loaderText, height = if (compact) 44.dp else 84.dp)
+            Column(Modifier.padding(if (compact) 10.dp else 14.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp)) {
             if (selected) {
                 Text("SELECTED", style = MaterialTheme.typography.labelSmall, color = scheme.primary)
             }
@@ -428,4 +423,30 @@ private fun RkbModpackInstanceDialog(
             }
         }
     )
+}
+
+/** Compact search box (40 dp high, one line). The Material text field has a 56 dp minimum and wrapped its hint. */
+@Composable
+private fun RkbSearchField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = scheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, scheme.outlineVariant)
+    ) {
+        Box(Modifier.padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+            if (value.isEmpty()) {
+                Text("Search instances", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 1, softWrap = false)
+            }
+            androidx.compose.foundation.text.BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = scheme.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(scheme.primary),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }

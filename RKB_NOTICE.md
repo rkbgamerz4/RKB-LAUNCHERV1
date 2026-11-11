@@ -81,3 +81,11 @@ Also unverified: Mods rail item opens the per-instance mod manager directly.
 - Old inherited About page removed from the UI (the file `AboutInfoScreen.kt` is kept in the tree but no longer referenced); new `RkbAboutScreen` shows logo, description, developer RKB GAMERZ, version read from the app, Java engine info (bundled runtimes and active renderer read at runtime), Rust Edition status (not integrated), the three official links in the required order, credits and the existing library/license list.
 - Signing: the RKB debug key file is optional; without it Gradle falls back to Android's standard debug key.
 - Rust Edition is NOT integrated: see docs/HORIZON_ENGINE_PLAN.md and docs/HORIZON_STANDALONE_TEST_PLAN.md.
+
+## Batch 13 (uncompiled)
+- Rust Edition on hold: hub card and page say "Coming soon"; the external-app Horizon card is gone from Instances; About says "Coming soon".
+- Download hub rebuilt compact for phones in landscape (no clipped titles/tags/buttons); glow and fade-in effects removed.
+- Top bar shows plain "Download" on the hub; Instances header compacted (40 dp controls, one-line search).
+- Controls: the bundled PojavLauncher layout (assets/pojav_default_layout.json, supplied by the owner) is the default and is selected once after update;
+  the inherited Zalith default layout asset was removed; imports accept PojavLauncher layout files only. Existing layout files on disk are not deleted.
+  The Zalith control engine still draws and handles input; only the file format and the default changed.
