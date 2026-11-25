@@ -53,10 +53,11 @@ runs:
             exit 1
           fi
 
-          cert="$("$apksigner" verify --print-certs "$apk" \
-            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
+          cert="$("$apksigner" verify --print-certs "$apk" 2>&1 \
+            | sed -n 's/.*SHA-256 digest:[[:space:]]*//p' \
             | head -n 1 \
             | tr -d ':' \
+            | tr -d '[:space:]' \
             | tr '[:upper:]' '[:lower:]')"
           if [ "$cert" != "$expected_cert" ]; then
             echo "::error::Unexpected signing certificate in $apk: $cert"
