@@ -7,8 +7,10 @@
  */
 package com.movtery.layer_controller.compat
 
+import android.content.Context
 import com.movtery.layer_controller.layout.ControlLayout
 import com.movtery.layer_controller.pojav.PojavLayoutConverter
+import kotlin.math.roundToInt
 
 /**
  * Geometry used while converting absolute source coordinates.
@@ -27,6 +29,71 @@ data class ControlImportGeometry(
         require(widthPx > 0) { "Control import width must be greater than zero." }
         require(heightPx > 0) { "Control import height must be greater than zero." }
         require(density > 0f) { "Control import density must be greater than zero." }
+    }
+
+    companion object {
+        /**
+         * Build a landscape import viewport from raw display metrics.
+         *
+         * Pojav expressions are evaluated in physical pixels. RKB renders the
+         * control layer over the whole window, so the import viewport has to be
+         * the real landscape window size. Normalising to landscape order keeps
+         * the axes stable when the user imports while the device is in portrait.
+         *
+         * Degenerate metrics are rejected instead of being passed to the
+         * converter: a zero-sized viewport makes every percentage collapse to
+         * `(0, 0)` while the button sizes stay correct, which is exactly the
+         * "all controls stacked in the upper-left" failure.
+         */
+        fun fromDisplayMetrics(
+            widthPx: Int,
+            heightPx: Int,
+            density: Float
+        ): ControlImportGeometry {
+            require(widthPx > 0 && heightPx > 0) {
+                "Control import requires a real display size, got ${widthPx}x${heightPx}px."
+            }
+            require(density > 0f) {
+                "Control import requires a positive display density, got $density."
+            }
+            return ControlImportGeometry(
+                widthPx = maxOf(widthPx, heightPx),
+                heightPx = minOf(widthPx, heightPx),
+                density = density
+            )
+        }
+
+        /**
+         * Resolve the real application viewport.
+         *
+         * `Resources.getSystem()` is intentionally not used here. Its
+         * `DisplayMetrics` is not attached to a display and can report
+         * `widthPixels == heightPixels == 0`; the old importer then divided by a
+         * zero-sized free area and placed every control at `(0, 0)`.
+         *
+         * The application `Resources` follows the current window/display
+         * configuration, and the configuration values are used as a fallback if
+         * the metrics are ever incomplete.
+         */
+        fun fromContext(context: Context): ControlImportGeometry {
+            val metrics = context.resources.displayMetrics
+            var width = metrics.widthPixels
+            var height = metrics.heightPixels
+            var density = metrics.density
+
+            if (width <= 0 || height <= 0 || density <= 0f) {
+                val configuration = context.resources.configuration
+                if (density <= 0f) {
+                    density = configuration.densityDpi / 160f
+                }
+                if (density > 0f && (width <= 0 || height <= 0)) {
+                    width = (configuration.screenWidthDp * density).roundToInt()
+                    height = (configuration.screenHeightDp * density).roundToInt()
+                }
+            }
+
+            return fromDisplayMetrics(width, height, density)
+        }
     }
 }
 

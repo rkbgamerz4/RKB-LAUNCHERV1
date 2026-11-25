@@ -66,6 +66,22 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Run control compatibility unit tests
+        shell: bash
+        run: |
+          ./gradlew :LayerController:testDebugUnitTest \
+            --no-daemon \
+            --stacktrace
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LayerController-unit-test-reports
+          path: LayerController/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Build actual RKB Launcher debug APK
         shell: bash
         run: |

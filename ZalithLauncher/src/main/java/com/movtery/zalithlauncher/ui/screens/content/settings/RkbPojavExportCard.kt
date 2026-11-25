@@ -3,7 +3,6 @@
  */
 package com.movtery.zalithlauncher.ui.screens.content.settings
 
-import android.content.res.Resources
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.movtery.layer_controller.compat.ControlImportGeometry
 import com.movtery.layer_controller.layout.loadLayoutFromFile
 import com.movtery.layer_controller.pojav.PojavLayoutConverter
 import com.movtery.zalithlauncher.game.control.ControlManager
@@ -50,9 +50,14 @@ fun RkbPojavExportCard(modifier: Modifier = Modifier) {
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     runCatching {
-                        val dm = Resources.getSystem().displayMetrics
+                        val geometry = ControlImportGeometry.fromContext(context)
                         val layout = loadLayoutFromFile(data.file)
-                        val out = PojavLayoutConverter.exportToPojav(layout, dm.widthPixels, dm.heightPixels, dm.density)
+                        val out = PojavLayoutConverter.exportToPojav(
+                            layout,
+                            geometry.widthPx,
+                            geometry.heightPx,
+                            geometry.density
+                        )
                         val stream = context.contentResolver.openOutputStream(uri) ?: error("cannot open output")
                         stream.use { it.write(out.json.toByteArray()) }
                         out.warnings

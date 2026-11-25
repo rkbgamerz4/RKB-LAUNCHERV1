@@ -221,6 +221,12 @@ object PojavLayoutConverter {
         density: Float,
         layoutName: String
     ): ImportResult {
+        require(screenWidthPx > 0 && screenHeightPx > 0) {
+            "Pojav import requires a real viewport, got ${screenWidthPx}x${screenHeightPx}px."
+        }
+        require(density > 0f) {
+            "Pojav import requires a positive density, got $density."
+        }
         val warnings = ArrayList<String>()
         val root = parser.parseToJsonElement(jsonString).jsonObject
         val list = root["mControlDataList"]
@@ -266,6 +272,15 @@ object PojavLayoutConverter {
                 mainButtons += it.first
                 it.second?.let { layer -> extraLayers += layer }
             }
+        }
+
+        // A valid Pojav layout almost never has two controls at exactly the same
+        // percentage. If everything collapsed, the import viewport was wrong.
+        // Report it instead of silently producing overlapping controls.
+        if (mainButtons.size > 1 && mainButtons.map { it.position }.distinct().size == 1) {
+            warnings += "All ${mainButtons.size} controls resolved to the same position. " +
+                "The import viewport (${ctx.screenW}x${ctx.screenH}px) was probably invalid, " +
+                "so their original positions could not be preserved."
         }
 
         val mainLayer = ControlLayer(
@@ -321,7 +336,8 @@ object PojavLayoutConverter {
         styles: MutableMap<StyleKey, ButtonStyle>,
         warnings: MutableList<String>,
         forcedEvents: List<ClickEvent>? = null,
-        positionPx: Pair<Float, Float>? = null
+        positionPx: Pair<Float, Float>? = null,
+        sizeOverrideDp: Pair<Float, Float>? = null
     ): NormalData? {
         val name = o["name"]?.jsonPrimitive?.contentOrNull ?: "Button"
         val events = forcedEvents ?: eventsFromKeycodes(o, name, ctx, warnings)
@@ -329,8 +345,11 @@ object PojavLayoutConverter {
             warnings += "Button \"$name\" was kept as a visual-only button: RKB cannot perform its Pojav action(s)."
         }
 
-        val wDp = sourceDp(o.float("width", 50f), ctx)
-        val hDp = sourceDp(o.float("height", 50f), ctx)
+        // Aligned drawer children inherit the drawer head's size in Pojav
+        // (ControlDrawer.resizeButtons), so an override is used instead of the
+        // child's own width/height.
+        val wDp = sizeOverrideDp?.first ?: sourceDp(o.float("width", 50f), ctx)
+        val hDp = sizeOverrideDp?.second ?: sourceDp(o.float("height", 50f), ctx)
         val wPx = dpToPx(wDp, ctx)
         val hPx = dpToPx(hDp, ctx)
         val (xPx, yPx) = positionPx ?: (
@@ -458,36 +477,46 @@ object PojavLayoutConverter {
         } else {
             ownEvents + ClickEvent(ClickEvent.Type.SwitchLayer, layerId)
         }
+        val headWDp = sourceDp(props.float("width", 50f), ctx)
+        val headHDp = sourceDp(props.float("height", 50f), ctx)
         val head = convertButton(
             props, ctx, styles, warnings,
             forcedEvents = headEvents
         ) ?: return null
 
-        val headW = dpToPx(sourceDp(props.float("width", 50f), ctx), ctx)
-        val headH = dpToPx(sourceDp(props.float("height", 50f), ctx), ctx)
+        val headW = dpToPx(headWDp, ctx)
+        val headH = dpToPx(headHDp, ctx)
         val headX = evalPos(props["dynamicX"], props["x"], headW, headH, ctx, warnings, name)
         val headY = evalPos(props["dynamicY"], props["y"], headW, headH, ctx, warnings, name)
         val margin = (2f * ctx.density).toInt().toFloat()
 
-        val orientation = when (val raw = o["orientation"]?.jsonPrimitive) {
-            is JsonPrimitive -> raw.contentOrNull?.uppercase()
-                ?: raw.intOrNull?.let { ControlDrawerOrientation.fromInt(it) } ?: "FREE"
-            else -> "FREE"
-        }
+        val orientation = drawerOrientation(o["orientation"])
+        val aligned = orientation != "FREE"
         val children = ArrayList<NormalData>()
         (o["buttonProperties"] as? JsonArray)?.forEachIndexed { i, element ->
             val child = element.jsonObject
-            val childW = dpToPx(sourceDp(child.float("width", 50f), ctx), ctx)
-            val childH = dpToPx(sourceDp(child.float("height", 50f), ctx), ctx)
             val (px, py) = when (orientation) {
+                // Pojav ControlDrawer.alignButtons uses the drawer head's width
+                // for horizontal layouts and its height for vertical layouts.
                 "DOWN" -> headX to (headY + (i + 1) * (headH + margin))
-                "UP" -> headX to (headY - (i + 1) * (childH + margin))
-                "LEFT" -> (headX - (i + 1) * (childW + margin)) to headY
+                "UP" -> headX to (headY - (i + 1) * (headH + margin))
+                "LEFT" -> (headX - (i + 1) * (headW + margin)) to headY
                 "RIGHT" -> (headX + (i + 1) * (headW + margin)) to headY
-                else -> evalPos(child["dynamicX"], child["x"], childW, childH, ctx, warnings, name) to
-                    evalPos(child["dynamicY"], child["y"], childW, childH, ctx, warnings, name)
+                else -> {
+                    val childW = dpToPx(sourceDp(child.float("width", 50f), ctx), ctx)
+                    val childH = dpToPx(sourceDp(child.float("height", 50f), ctx), ctx)
+                    evalPos(child["dynamicX"], child["x"], childW, childH, ctx, warnings, name) to
+                        evalPos(child["dynamicY"], child["y"], childW, childH, ctx, warnings, name)
+                }
             }
-            convertButton(child, ctx, styles, warnings, positionPx = px to py)?.let { children += it }
+            // ControlDrawer.resizeButtons forces every aligned child to the
+            // drawer head's size; FREE children keep their own dimensions.
+            val sizeOverride = if (aligned) headWDp to headHDp else null
+            convertButton(
+                child, ctx, styles, warnings,
+                positionPx = px to py,
+                sizeOverrideDp = sizeOverride
+            )?.let { children += it }
         }
 
         val layer = if (children.isEmpty()) null else ControlLayer(
@@ -503,6 +532,25 @@ object PojavLayoutConverter {
             warnings += "Drawer \"$name\" has no supported child buttons; only its toggle button was imported."
         }
         return head to layer
+    }
+
+    /**
+     * Pojav stores the drawer orientation as an enum name in newer layouts and
+     * as an integer (DOWN=0, LEFT=1, UP=2, RIGHT=3, FREE=4) in older ones.
+     * A numeric JSON value must be parsed as a number first: `contentOrNull`
+     * would turn `0` into the string "0" and fall through to FREE.
+     */
+    private fun drawerOrientation(raw: JsonElement?): String {
+        val primitive = raw as? JsonPrimitive ?: return "FREE"
+        if (!primitive.isString) {
+            primitive.intOrNull?.let { return ControlDrawerOrientation.fromInt(it) }
+        }
+        val text = primitive.contentOrNull?.trim()?.uppercase() ?: return "FREE"
+        if (text.isEmpty()) return "FREE"
+        return when (text) {
+            "DOWN", "LEFT", "UP", "RIGHT", "FREE" -> text
+            else -> text.toIntOrNull()?.let { ControlDrawerOrientation.fromInt(it) } ?: "FREE"
+        }
     }
 
     private object ControlDrawerOrientation {
@@ -648,7 +696,13 @@ object PojavLayoutConverter {
     ): ButtonPosition {
         val freeX = ctx.screenW - wPx
         val freeY = ctx.screenH - hPx
-        if (xPx < -1f || yPx < -1f || xPx > freeX + 1f || yPx > freeY + 1f) {
+        if (freeX <= 0f || freeY <= 0f) {
+            // A button can legitimately fill the screen, but a whole layout
+            // cannot. Never hide this: a zero/degenerate viewport is the exact
+            // cause of controls stacking in the upper-left corner.
+            warnings += "Button \"$name\" (${format(wPx)}x${format(hPx)}px) does not fit the import " +
+                "viewport (${ctx.screenW}x${ctx.screenH}px); its position could not be preserved."
+        } else if (xPx < -1f || yPx < -1f || xPx > freeX + 1f || yPx > freeY + 1f) {
             warnings += "Button \"$name\" extends outside the import viewport (${ctx.screenW}x${ctx.screenH}); its position was clamped to the edge."
         }
         val px = if (freeX > 0f) (xPx / freeX * 10000f).roundToInt().coerceIn(0, 10000) else 0
@@ -657,8 +711,13 @@ object PojavLayoutConverter {
     }
 
     /**
-     * Evaluate Pojav's dynamicX/dynamicY expression in pixels, falling back to the
-     * legacy absolute x/y field when there is no expression.
+     * Evaluate Pojav's dynamicX/dynamicY expression in pixels, falling back to
+     * the legacy absolute x/y field when there is no usable expression.
+     *
+     * Legacy x/y values are absolute pixels in v1/v2 layouts, but some converted
+     * layouts store an expression string there instead of a number. Both forms
+     * are evaluated; a position is never silently replaced by zero while any
+     * usable source value exists.
      */
     private fun evalPos(
         dynamic: JsonElement?,
@@ -669,8 +728,6 @@ object PojavLayoutConverter {
         warnings: MutableList<String>,
         name: String
     ): Float {
-        val expr = dynamic?.jsonPrimitive?.contentOrNull
-        if (expr.isNullOrBlank()) return legacy?.jsonPrimitive?.floatOrNull ?: 0f
         val margin = (2f * ctx.density).toInt().toFloat()
         val vars = mapOf(
             "top" to 0f, "left" to 0f,
@@ -679,12 +736,25 @@ object PojavLayoutConverter {
             "screen_width" to ctx.screenW.toFloat(), "screen_height" to ctx.screenH.toFloat(),
             "margin" to margin, "preferred_scale" to 100f
         )
-        return try {
-            ExprEval(expr, vars, ctx.density).evaluate()
-        } catch (e: Exception) {
-            warnings += "Button \"$name\": could not evaluate position \"$expr\" (${e.message ?: "invalid expression"}); placed at the top-left."
-            0f
+
+        fun evaluate(element: JsonElement?): Float? {
+            val primitive = element as? JsonPrimitive ?: return null
+            val text = primitive.contentOrNull?.trim().orEmpty()
+            if (text.isEmpty()) return null
+            return try {
+                ExprEval(text, vars, ctx.density).evaluate()
+            } catch (e: Exception) {
+                warnings += "Button \"$name\": could not evaluate position \"$text\" " +
+                    "(${e.message ?: "invalid expression"})."
+                null
+            }
         }
+
+        evaluate(dynamic)?.let { return it }
+        evaluate(legacy)?.let { return it }
+
+        warnings += "Button \"$name\" has no usable Pojav position; it was placed at the top-left."
+        return 0f
     }
 
     // ---------------------------------------------------------------- export
@@ -840,22 +910,24 @@ object PojavLayoutConverter {
 }
 
 /**
- * Small arithmetic evaluator for Pojav dynamic positions. Supports the operators
- * and helpers exposed by Pojav's expression parser (exp4j): + - * / % ^, dp, px,
- * abs, sqrt, min, max, floor, ceil, round, pow.
+ * Arithmetic evaluator for Pojav dynamic positions. Mirrors the operators and
+ * helpers exposed by Pojav's expression parser (exp4j): + - * / % ^, the
+ * dp/px conversion helpers, the trigonometric/exponential functions and the
+ * `pi` / `e` constants. All whitespace is ignored, matching Pojav's JSONUtils
+ * substitution + exp4j evaluation.
  */
 private class ExprEval(src: String, vars: Map<String, Float>, private val density: Float) {
     private val s: String
     private var pos = 0
 
     init {
-        var text = src
         val re = Regex("\\$\\{(\\w+)}")
-        text = re.replace(text) { m ->
-            val v = vars[m.groupValues[1]] ?: throw IllegalArgumentException("unknown variable \${${m.groupValues[1]}}")
+        val text = re.replace(src) { m ->
+            val v = vars[m.groupValues[1]]
+                ?: throw IllegalArgumentException("unknown variable \${${m.groupValues[1]}}")
             "(" + v.toString() + ")"
         }
-        s = text.replace(" ", "")
+        s = text.filterNot { it.isWhitespace() }
     }
 
     fun evaluate(): Float {
@@ -913,19 +985,28 @@ private class ExprEval(src: String, vars: Map<String, Float>, private val densit
             expect(')')
             return v
         }
-        if (c.isLetter()) {
+        if (c.isLetter() || c == '_') {
             val start = pos
             while (pos < s.length && (s[pos].isLetterOrDigit() || s[pos] == '_')) pos++
-            val fn = s.substring(start, pos).lowercase()
-            expect('(')
-            val args = ArrayList<Double>()
-            args += parseExpr()
-            while (pos < s.length && s[pos] == ',') {
+            val name = s.substring(start, pos)
+            if (pos < s.length && s[pos] == '(') {
                 pos++
-                args += parseExpr()
+                val args = ArrayList<Double>()
+                if (pos < s.length && s[pos] != ')') {
+                    args += parseExpr()
+                    while (pos < s.length && s[pos] == ',') {
+                        pos++
+                        args += parseExpr()
+                    }
+                }
+                expect(')')
+                return applyFunction(name.lowercase(), args)
             }
-            expect(')')
-            return applyFunction(fn, args)
+            return when (name.lowercase()) {
+                "pi" -> Math.PI
+                "e" -> Math.E
+                else -> throw IllegalArgumentException("unknown identifier $name")
+            }
         }
         val start = pos
         while (pos < s.length && (s[pos].isDigit() || s[pos] == '.')) pos++
@@ -939,21 +1020,36 @@ private class ExprEval(src: String, vars: Map<String, Float>, private val densit
     }
 
     private fun applyFunction(fn: String, args: List<Double>): Double {
-        fun arg(index: Int) = args.getOrNull(index) ?: throw IllegalArgumentException("$fn needs another argument")
+        fun arg(index: Int) = args.getOrNull(index)
+            ?: throw IllegalArgumentException("$fn needs another argument")
         return when (fn) {
             "dp" -> arg(0) / density
             "px" -> arg(0) * density
             "abs" -> Math.abs(arg(0))
             "sqrt" -> Math.sqrt(arg(0))
+            "cbrt" -> Math.cbrt(arg(0))
             "min" -> Math.min(arg(0), arg(1))
             "max" -> Math.max(arg(0), arg(1))
             "floor" -> Math.floor(arg(0))
             "ceil" -> Math.ceil(arg(0))
             "round" -> Math.round(arg(0)).toDouble()
             "pow" -> Math.pow(arg(0), arg(1))
+            "exp" -> Math.exp(arg(0))
+            "log" -> Math.log(arg(0))
+            "log10" -> Math.log10(arg(0))
+            "log2" -> Math.log(arg(0)) / Math.log(2.0)
+            "log1p" -> Math.log1p(arg(0))
             "sin" -> Math.sin(arg(0))
             "cos" -> Math.cos(arg(0))
             "tan" -> Math.tan(arg(0))
+            "asin" -> Math.asin(arg(0))
+            "acos" -> Math.acos(arg(0))
+            "atan" -> Math.atan(arg(0))
+            "atan2" -> Math.atan2(arg(0), arg(1))
+            "sinh" -> Math.sinh(arg(0))
+            "cosh" -> Math.cosh(arg(0))
+            "tanh" -> Math.tanh(arg(0))
+            "signum" -> Math.signum(arg(0))
             else -> throw IllegalArgumentException("unknown function $fn")
         }
     }

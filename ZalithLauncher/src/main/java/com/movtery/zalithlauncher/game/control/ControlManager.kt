@@ -32,7 +32,6 @@ import com.movtery.zalithlauncher.setting.AllSettings
 import com.movtery.zalithlauncher.utils.file.readString
 import com.movtery.zalithlauncher.utils.logging.Logger
 import kotlinx.coroutines.CoroutineScope
-import android.content.res.Resources
 import com.movtery.layer_controller.compat.ControlImportGeometry
 import com.movtery.layer_controller.compat.ControlLayoutImporters
 import kotlinx.coroutines.Dispatchers
@@ -211,6 +210,7 @@ object ControlManager {
      * 尝试导入控制布局
      */
     suspend fun importControl(
+        context: Context,
         inputStream: InputStream,
         onSerializationError: (Exception) -> Unit,
         catchedError: (Exception) -> Unit,
@@ -223,13 +223,11 @@ object ControlManager {
                 val jsonString = stream.readString()
                 // Adapters only convert foreign schemas into the normal RKB model.
                 // Anything unrecognised keeps using the original RKB loader.
-                val dm = Resources.getSystem().displayMetrics
-                val geometry = ControlImportGeometry(
-                    // Control editors and the import conversion work in landscape pixels.
-                    widthPx = maxOf(dm.widthPixels, dm.heightPixels),
-                    heightPx = minOf(dm.widthPixels, dm.heightPixels),
-                    density = dm.density
-                )
+                //
+                // Use the application viewport, not Resources.getSystem(): the
+                // system Resources is not attached to a display and can report a
+                // 0x0 size, which collapsed every imported control to (0, 0).
+                val geometry = ControlImportGeometry.fromContext(context)
                 val imported = ControlLayoutImporters.importIfSupported(
                     json = jsonString,
                     geometry = geometry,
