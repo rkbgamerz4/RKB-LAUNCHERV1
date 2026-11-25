@@ -417,7 +417,7 @@ class PojavLayoutConverterTest {
         val geometry = ControlImportGeometry.fromDisplayMetrics(1080, 2400, 2.75f)
         assertEquals(2400, geometry.widthPx)
         assertEquals(1080, geometry.heightPx)
-        assertEquals(2.75f, geometry.density, 0.0f)
+        assertEquals(2.75, geometry.density.toDouble(), 0.0)
     }
 
     @Test
