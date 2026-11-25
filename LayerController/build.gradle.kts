@@ -51,4 +51,6 @@ dependencies {
     implementation(project(":InputMap"))
     //Utils
     implementation(libs.ktor.serialization.kotlinx.json)
+    //Tests
+    testImplementation(libs.junit)
 }

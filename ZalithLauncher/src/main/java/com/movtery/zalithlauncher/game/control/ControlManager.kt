@@ -33,7 +33,8 @@ import com.movtery.zalithlauncher.utils.file.readString
 import com.movtery.zalithlauncher.utils.logging.Logger
 import kotlinx.coroutines.CoroutineScope
 import android.content.res.Resources
-import com.movtery.layer_controller.pojav.PojavLayoutConverter
+import com.movtery.layer_controller.compat.ControlImportGeometry
+import com.movtery.layer_controller.compat.ControlLayoutImporters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -213,25 +214,31 @@ object ControlManager {
         inputStream: InputStream,
         onSerializationError: (Exception) -> Unit,
         catchedError: (Exception) -> Unit,
+        onWarnings: (List<String>) -> Unit = {},
         onFinished: () -> Unit = {},
     ) = withContext(Dispatchers.IO) {
         val file = getNewRandomFile()
         try {
             inputStream.use { stream ->
                 val jsonString = stream.readString()
-                val layout = if (PojavLayoutConverter.looksLikePojav(jsonString)) {
-                    // PojavLauncher layout: convert (keys, sizes, dynamic positions, drawers) to the RKB layer format
-                    val dm = Resources.getSystem().displayMetrics
-                    PojavLayoutConverter.importPojav(
-                        jsonString = jsonString,
-                        screenWidthPx = dm.widthPixels,
-                        screenHeightPx = dm.heightPixels,
-                        density = dm.density,
-                        layoutName = "Pojav import"
-                    ).layout
-                } else {
-                    loadLayoutFromString(jsonString)
+                // Adapters only convert foreign schemas into the normal RKB model.
+                // Anything unrecognised keeps using the original RKB loader.
+                val dm = Resources.getSystem().displayMetrics
+                val geometry = ControlImportGeometry(
+                    // Control editors and the import conversion work in landscape pixels.
+                    widthPx = maxOf(dm.widthPixels, dm.heightPixels),
+                    heightPx = minOf(dm.widthPixels, dm.heightPixels),
+                    density = dm.density
+                )
+                val imported = ControlLayoutImporters.importIfSupported(
+                    json = jsonString,
+                    geometry = geometry,
+                    layoutName = "Pojav import"
+                )
+                if (imported != null && imported.warnings.isNotEmpty()) {
+                    onWarnings(imported.warnings)
                 }
+                val layout = imported?.layout ?: loadLayoutFromString(jsonString)
                 layout.saveToFile(file)
             }
             onFinished()

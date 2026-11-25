@@ -670,6 +670,7 @@ class MainActivity : BaseAppCompatActivity() {
                 )
             )
         }
+        val importWarnings = mutableListOf<String>()
         TaskSystem.submitTask(
             Task.runTask(
                 dispatcher = Dispatchers.IO,
@@ -694,14 +695,31 @@ class MainActivity : BaseAppCompatActivity() {
                             catchedError =  {
                                 showError(message = androidText(it.getMessageOrToString()))
                             },
+                            onWarnings = { warnings ->
+                                importWarnings.addAll(warnings)
+                            },
                             onFinished = {
                                 done = true
                             }
                         )
                     }
                     ControlManager.refresh()
-                    if (done) {
-                        withContext(Dispatchers.Main) {
+                    withContext(Dispatchers.Main) {
+                        if (importWarnings.isNotEmpty()) {
+                            val shown = importWarnings.take(8)
+                            val message = buildString {
+                                append(shown.joinToString("\n"))
+                                if (importWarnings.size > shown.size) {
+                                    append("\n…")
+                                }
+                            }
+                            MaterialAlertDialogBuilder(this@MainActivity)
+                                .setTitle(R.string.control_manage_import_warnings)
+                                .setMessage(message)
+                                .setPositiveButton(android.R.string.ok, null)
+                                .showThemed()
+                        }
+                        if (done) {
                             Toast.makeText(
                                 this@MainActivity,
                                 getString(R.string.generic_done),
