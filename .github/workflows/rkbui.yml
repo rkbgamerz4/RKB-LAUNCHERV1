@@ -30,6 +30,13 @@ jobs:
           ref: rkb-new-source
           submodules: recursive
 
+      - name: Checkout signing helpers
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .signing-helpers
+          sparse-checkout: .github/actions
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -51,8 +58,22 @@ jobs:
           java -version
           ./gradlew --version
 
+      - name: Set up persistent signing
+        uses: ./.signing-helpers/.github/actions/setup-rkb-signing
+        env:
+          RKB_KEYSTORE_BASE64: ${{ secrets.RKB_KEYSTORE_BASE64 }}
+          RKB_STORE_PASSWORD: ${{ secrets.RKB_STORE_PASSWORD }}
+          RKB_KEY_ALIAS: ${{ secrets.RKB_KEY_ALIAS }}
+          RKB_KEY_PASSWORD: ${{ secrets.RKB_KEY_PASSWORD }}
+
       - name: Build Debug APK
         run: ./gradlew :ZalithLauncher:assembleDebug --no-daemon --stacktrace
+
+      - name: Verify APK package and signing identity
+        uses: ./.signing-helpers/.github/actions/verify-rkb-apk
+        with:
+          apk-dir: ZalithLauncher/build/outputs/apk/debug
+          expected-package: com.rkbgamerz.rkblauncher.debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -61,3 +82,10 @@ jobs:
           path: ZalithLauncher/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Clean up temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/rkb-persistent-signing.jks"
+          rm -rf .signing-helpers

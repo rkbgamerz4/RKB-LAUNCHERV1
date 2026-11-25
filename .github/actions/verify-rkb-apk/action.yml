@@ -1,0 +1,74 @@
+name: Verify RKB APK identity
+description: Verify APK package name and signing certificate SHA-256 fingerprint against the persistent RKB identity.
+
+inputs:
+  apk-dir:
+    description: Directory containing the APK files to verify
+    required: true
+  expected-package:
+    description: Expected Android package/application id
+    required: true
+  expected-certificate-sha256:
+    description: Expected signing certificate SHA-256 fingerprint
+    required: false
+    default: "771d7055caab7ec636981cabda94285edd995eecd9646101ef0a45ddd7d660d2"
+
+runs:
+  using: composite
+  steps:
+    - name: Verify APK package and signing certificate
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        apk_dir='${{ inputs.apk-dir }}'
+        expected_package='${{ inputs.expected-package }}'
+        expected_cert='${{ inputs.expected-certificate-sha256 }}'
+
+        sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+        if [ -z "$sdk_root" ] || [ ! -d "$sdk_root/build-tools" ]; then
+          echo "::error::Android build-tools directory not found"
+          exit 1
+        fi
+
+        build_tools="$(find "$sdk_root/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+        aapt2="$build_tools/aapt2"
+        apksigner="$build_tools/apksigner"
+        if [ ! -x "$aapt2" ] || [ ! -x "$apksigner" ]; then
+          echo "::error::aapt2 or apksigner not found in $build_tools"
+          exit 1
+        fi
+
+        expected_cert="$(printf '%s' "$expected_cert" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+        count=0
+        while IFS= read -r apk; do
+          count=$((count + 1))
+
+          package="$("$aapt2" dump packagename "$apk" 2>/dev/null || true)"
+          if [ -z "$package" ]; then
+            package="$("$aapt2" dump badging "$apk" 2>/dev/null | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)"
+          fi
+          if [ "$package" != "$expected_package" ]; then
+            echo "::error::Unexpected package in $apk: $package (expected $expected_package)"
+            exit 1
+          fi
+
+          cert="$("$apksigner" verify --print-certs "$apk" \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
+            | head -n 1 \
+            | tr -d ':' \
+            | tr '[:upper:]' '[:lower:]')"
+          if [ "$cert" != "$expected_cert" ]; then
+            echo "::error::Unexpected signing certificate in $apk: $cert"
+            exit 1
+          fi
+
+          echo "Verified package: $package"
+          echo "Verified certificate SHA-256: $cert"
+          echo "Verified APK: $apk"
+        done < <(find "$apk_dir" -type f -name '*.apk' | sort)
+
+        if [ "$count" -eq 0 ]; then
+          echo "::error::No APKs found in $apk_dir"
+          exit 1
+        fi

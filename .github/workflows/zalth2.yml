@@ -16,11 +16,28 @@ jobs:
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-37.2" "ndk;25.2.9519653" "cmake;3.22.1" || sdkmanager "platforms;android-37" "ndk;25.2.9519653"
+      - name: Set up persistent signing
+        uses: ./.github/actions/setup-rkb-signing
+        env:
+          RKB_KEYSTORE_BASE64: ${{ secrets.RKB_KEYSTORE_BASE64 }}
+          RKB_STORE_PASSWORD: ${{ secrets.RKB_STORE_PASSWORD }}
+          RKB_KEY_ALIAS: ${{ secrets.RKB_KEY_ALIAS }}
+          RKB_KEY_PASSWORD: ${{ secrets.RKB_KEY_PASSWORD }}
       - name: Build debug APK (arm64)
         run: |
           chmod +x gradlew
           ./gradlew ZalithLauncher:assembleDebug -Darch=arm64
+      - name: Verify APK package and signing identity
+        uses: ./.github/actions/verify-rkb-apk
+        with:
+          apk-dir: ZalithLauncher/build/outputs/apk/debug
+          expected-package: com.rkbgamerz.rkblauncher.debug
       - uses: actions/upload-artifact@v4
         with:
           name: rkb-launcher-debug-arm64
           path: ZalithLauncher/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+      - name: Clean up temporary signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/rkb-persistent-signing.jks"

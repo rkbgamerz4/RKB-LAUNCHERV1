@@ -46,26 +46,33 @@ android {
         }
     }
 
+    val rkbKeyStorePath = System.getenv("RKB_KEYSTORE")?.takeIf { it.isNotBlank() }
+    val rkbStorePassword = (System.getenv("RKB_STORE_PASSWORD") ?: System.getenv("RKB_KEYSTORE_PASSWORD"))?.takeIf { it.isNotBlank() }
+    val rkbKeyAlias = System.getenv("RKB_KEY_ALIAS")?.takeIf { it.isNotBlank() }
+    val rkbKeyPassword = System.getenv("RKB_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+    val useSecretSigning = rkbKeyStorePath != null && rkbStorePassword != null && rkbKeyAlias != null && rkbKeyPassword != null
+
     signingConfigs {
-        // RKB: fixed DEBUG-ONLY key (public password "android", like Android's own debug key) so every CI build
-        // is signed identically and installs as an UPDATE over the previous one. Never use it to publish.
+        // RKB: persistent original debug key already used by distributed APKs. Reused as-is; never regenerated.
         create("rkbDebugKey") {
             storeFile = file("rkb-debug.jks")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
-        // RKB: release signing is only configured when Release signing is only configured when
-        // RKB_KEYSTORE / RKB_KEYSTORE_PASSWORD / RKB_KEY_ALIAS / RKB_KEY_PASSWORD are provided.
-        System.getenv("RKB_KEYSTORE")?.let { ks ->
+        // CI injects the same persistent keystore through GitHub Secrets when configured.
+        // When present, both debug and release variants use this config so the signing identity cannot change.
+        if (useSecretSigning) {
             create("releaseBuild") {
-                storeFile = file(ks)
-                storePassword = System.getenv("RKB_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("RKB_KEY_ALIAS")
-                keyPassword = System.getenv("RKB_KEY_PASSWORD")
+                storeFile = file(rkbKeyStorePath!!)
+                storePassword = rkbStorePassword!!
+                keyAlias = rkbKeyAlias!!
+                keyPassword = rkbKeyPassword!!
             }
         }
     }
+
+    val persistentSigningConfig = signingConfigs.findByName("releaseBuild") ?: signingConfigs.getByName("rkbDebugKey")
 
     defaultConfig {
         applicationId = "com.rkbgamerz.rkblauncher"
@@ -80,15 +87,15 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // Release builds use the real release key when provided, otherwise the fixed debug key (installable, updatable)
-            signingConfig = signingConfigs.findByName("releaseBuild") ?: signingConfigs.getByName("rkbDebugKey")
+            // RKB: release and debug use the same persistent signing identity.
+            signingConfig = persistentSigningConfig
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
         debug {
-            signingConfig = signingConfigs.getByName("rkbDebugKey")
+            signingConfig = persistentSigningConfig
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"

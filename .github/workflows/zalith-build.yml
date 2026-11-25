@@ -40,12 +40,26 @@ jobs:
           chmod +x gradlew
           ./gradlew projects --no-daemon
 
+      - name: Set up persistent signing
+        uses: ./.github/actions/setup-rkb-signing
+        env:
+          RKB_KEYSTORE_BASE64: ${{ secrets.RKB_KEYSTORE_BASE64 }}
+          RKB_STORE_PASSWORD: ${{ secrets.RKB_STORE_PASSWORD }}
+          RKB_KEY_ALIAS: ${{ secrets.RKB_KEY_ALIAS }}
+          RKB_KEY_PASSWORD: ${{ secrets.RKB_KEY_PASSWORD }}
+
       - name: Build debug APK
         run: |
           ./gradlew :ZalithLauncher:assembleDebug \
             -Darch=arm64 \
             --no-daemon \
             --stacktrace
+
+      - name: Verify APK package and signing identity
+        uses: ./.github/actions/verify-rkb-apk
+        with:
+          apk-dir: ZalithLauncher/build/outputs/apk/debug
+          expected-package: com.rkbgamerz.rkblauncher.debug
 
       - name: Upload APK
         if: success()
@@ -55,3 +69,8 @@ jobs:
           path: ZalithLauncher/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Clean up temporary signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/rkb-persistent-signing.jks"

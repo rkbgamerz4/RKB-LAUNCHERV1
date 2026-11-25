@@ -91,44 +91,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Remove old debug keystore
-        run: |
-          rm -f app_pojavlauncher/debug.keystore
-          rm -f app_pojavlauncher/debug.keystore.bak
-
-      - name: Generate debug keystore
-        run: |
-          keytool -genkeypair \
-            -v \
-            -keystore app_pojavlauncher/debug.keystore \
-            -storetype JKS \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass androiddebugkey \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
-
-      - name: Verify debug keystore
-        run: |
-          echo "=== Keystore ==="
-          file app_pojavlauncher/debug.keystore
-          ls -lh app_pojavlauncher/debug.keystore
-
-          echo "=== Key list ==="
-          keytool -list \
-            -keystore app_pojavlauncher/debug.keystore \
-            -storetype JKS \
-            -storepass android
-
-          echo "=== Key verification ==="
-          keytool -list \
-            -keystore app_pojavlauncher/debug.keystore \
-            -storetype JKS \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass androiddebugkey
+      - name: Set up persistent signing
+        uses: ./.github/actions/setup-rkb-signing
+        env:
+          RKB_KEYSTORE_BASE64: ${{ secrets.RKB_KEYSTORE_BASE64 }}
+          RKB_STORE_PASSWORD: ${{ secrets.RKB_STORE_PASSWORD }}
+          RKB_KEY_ALIAS: ${{ secrets.RKB_KEY_ALIAS }}
+          RKB_KEY_PASSWORD: ${{ secrets.RKB_KEY_PASSWORD }}
 
       - name: Clean Gradle build
         run: |
@@ -157,3 +126,8 @@ jobs:
           name: RKBLauncher-debug
           path: out/RKBLauncher-debug.apk
           if-no-files-found: error
+
+      - name: Clean up temporary signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/rkb-persistent-signing.jks"

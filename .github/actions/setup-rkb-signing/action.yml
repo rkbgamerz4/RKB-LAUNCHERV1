@@ -1,0 +1,43 @@
+name: Set up persistent RKB signing
+description: Decode the configured Base64 keystore to a temporary runner file, or reuse the repository's original persistent keystore.
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare persistent signing keystore
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        configured=0
+        missing=""
+        for name in RKB_KEYSTORE_BASE64 RKB_STORE_PASSWORD RKB_KEY_ALIAS RKB_KEY_PASSWORD; do
+          if [ -n "${!name:-}" ]; then
+            configured=$((configured + 1))
+          else
+            missing="$missing $name"
+          fi
+        done
+
+        if [ "$configured" -eq 4 ]; then
+          keystore="$RUNNER_TEMP/rkb-persistent-signing.jks"
+          umask 077
+          printf '%s' "$RKB_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+
+          echo "RKB_KEYSTORE=$keystore" >> "$GITHUB_ENV"
+          echo "RKB_STORE_PASSWORD=$RKB_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "RKB_KEY_ALIAS=$RKB_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "RKB_KEY_PASSWORD=$RKB_KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "RKB_SIGNING_SOURCE=base64-secret" >> "$GITHUB_ENV"
+          echo "Using GitHub Secret persistent signing keystore"
+        elif [ "$configured" -gt 0 ]; then
+          echo "::error::Incomplete signing secrets; missing:$missing"
+          exit 1
+        elif [ -f "ZalithLauncher/rkb-debug.jks" ]; then
+          echo "RKB_SIGNING_SOURCE=tracked-original-keystore" >> "$GITHUB_ENV"
+          echo "Using tracked original persistent keystore"
+        else
+          echo "::error::No signing secrets configured and no original keystore found"
+          exit 1
+        fi
