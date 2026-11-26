@@ -755,7 +755,26 @@ class PojavLayoutConverterTest {
             val layout = import(json).layout
             val buttons = layout.layers.flatMap { it.normalButtons }
             assertTrue("$label must import buttons", buttons.size >= 3)
-            assertTrue("$label must keep key mappings", buttons.all { it.clickEvents.isNotEmpty() })
+            val mapped = buttons.filter { it.clickEvents.isNotEmpty() }
+            assertTrue(
+                "$label must keep all supported key mappings " +
+                    "(${buttons.size - mapped.size} Pojav special action(s) are not representable in RKB)",
+                mapped.size >= buttons.size - 2
+            )
+            val keys = buttons.flatMap { it.clickEvents }.map { it.key }.toSet()
+            val expectedKeys = when (label) {
+                "v1" -> listOf("GLFW_KEY_W", "GLFW_KEY_A", "GLFW_KEY_S")
+                "v4" -> listOf(
+                    "GLFW_KEY_T", "GLFW_KEY_TAB", "GLFW_KEY_W", "GLFW_KEY_A",
+                    "GLFW_KEY_S", "GLFW_KEY_D", "GLFW_KEY_E"
+                )
+                else -> listOf(
+                    "GLFW_KEY_T", "GLFW_KEY_TAB", "GLFW_KEY_W", "GLFW_KEY_A",
+                    "GLFW_KEY_S", "GLFW_KEY_D", "GLFW_KEY_E", "GLFW_KEY_ESCAPE",
+                    "GLFW_KEY_LEFT_CONTROL", "GLFW_KEY_LEFT_ALT"
+                )
+            }
+            expectedKeys.forEach { key -> assertTrue("$label must preserve $key", key in keys) }
 
             val rendered = ControlLayoutSanity.renderedNormalButtons(
                 layout, IntSize(WIDTH, HEIGHT), DENSITY
