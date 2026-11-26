@@ -738,11 +738,11 @@ class PojavLayoutConverterTest {
     fun `v1 v4 and v8 imports render with distinct positions and key mappings`() {
         val v1 = """
             {"mControlDataList":[
-              {"name":"A","keycodes":[87,0,0,0],"width":100,"height":100,
+              {"name":"A","keycode":87,"width":100,"height":100,
                "dynamicX":"${'$'}{left}","dynamicY":"${'$'}{top}"},
-              {"name":"B","keycodes":[65,0,0,0],"width":100,"height":100,
+              {"name":"B","keycode":65,"width":100,"height":100,
                "dynamicX":"${'$'}{right}","dynamicY":"${'$'}{bottom}"},
-              {"name":"C","keycodes":[83,0,0,0],"width":100,"height":100,
+              {"name":"C","keycode":83,"width":100,"height":100,
                "dynamicX":"${'$'}{screen_width} / 2","dynamicY":"${'$'}{screen_height} / 2"}
             ],"scaledAt":100,"version":1}
         """.trimIndent()
