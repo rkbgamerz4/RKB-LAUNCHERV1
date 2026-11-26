@@ -64,7 +64,7 @@ import com.movtery.inputmap.keycodes.LwjglGlfwKeycode
 import com.movtery.inputmap.keycodes.OPEN_CHAT
 import com.movtery.inputmap.keycodes.OPEN_CHAT_VALUE
 import com.movtery.layer_controller.ControlBoxLayout
-import com.movtery.layer_controller.compat.ControlLayoutSanity
+import com.movtery.layer_controller.compat.ControlLayoutSelection
 import com.movtery.layer_controller.data.HideLayerWhen
 import com.movtery.layer_controller.event.ClickEvent
 import com.movtery.layer_controller.event.EventHandler
@@ -79,7 +79,6 @@ import com.movtery.zalithlauncher.bridge.ZLBridgeStates
 import com.movtery.zalithlauncher.bridge.ZLNativeInvoker
 import com.movtery.zalithlauncher.game.input.LWJGLCharSender
 import com.movtery.zalithlauncher.game.keycodes.mapToKeycode
-import com.movtery.zalithlauncher.game.control.ControlData
 import com.movtery.zalithlauncher.game.control.ControlManager
 import com.movtery.zalithlauncher.game.launch.handler.GameHandler
 import com.movtery.zalithlauncher.game.sdl.SdlBridge
@@ -355,94 +354,62 @@ private class GameViewModel(
     private data class ResolvedControlLayout(val file: File?, val layout: ControlLayout)
 
     /**
-     * Load the requested layout, but never render a collapsed Pojav import.
+     * Resolve the file gameplay will actually render.
      *
-     * Old versions saved imports without selecting them and could save every
-     * control at (0,0) when the import viewport was unusable. Such a file may
-     * still be the selected/global/per-version layout on existing installs, so
-     * gameplay has to recover instead of drawing all controls in one corner.
+     * The selection policy is deliberately a pure function in LayerController so
+     * the import -> select -> launch path can be tested without Android/Compose.
+     * Repairs are applied here, on the Main dispatcher, after the IO resolution.
      */
     private fun resolveControlLayout(requested: File?): ResolvedControlLayout {
-        val primary = requested ?: version.getControlPath()
-        val primaryLayout = getLayout(primary)
-        if (!ControlLayoutSanity.isCollapsedPojavImport(primaryLayout)) {
-            return ResolvedControlLayout(primary, primaryLayout)
-        }
-
-        val buttonCount = primaryLayout.layers.flatMap { it.normalButtons }.size
-        Logger.warning(
-            TAG,
-            "Control layout ${primary?.absolutePath ?: "<none>"} is a collapsed Pojav import " +
-                "($buttonCount buttons share one position); searching for a valid fallback."
+        val resolution = ControlLayoutSelection.resolve(
+            requested = requested,
+            globalName = AllSettings.controlLayout.getValue(),
+            versionOverride = version.getVersionConfig().control,
+            managerCandidates = ControlManager.dataList.value.map { data ->
+                ControlLayoutSelection.Candidate(
+                    file = data.file,
+                    layout = data.controlLayout.pack(),
+                    isSupported = data.isSupport
+                )
+            },
+            directory = PathManager.DIR_CONTROL_LAYOUTS,
+            load = { file -> runCatching { loadLayoutFromFile(file) }.getOrNull() },
+            emptyLayout = EmptyControlLayout
         )
-        val fallback = findValidControlLayout(primary)
-        if (fallback == null) {
-            Logger.warning(TAG, "No valid fallback control layout found; keeping the requested layout.")
-            return ResolvedControlLayout(primary, primaryLayout)
-        }
 
-        val fallbackLayout = getLayout(fallback)
-        Logger.warning(TAG, "Using valid fallback control layout ${fallback.absolutePath}.")
-        repairControlSelection(primary, fallback)
-        return ResolvedControlLayout(fallback, fallbackLayout)
+        when (resolution.reason) {
+            ControlLayoutSelection.Reason.PRIMARY ->
+                Logger.info(
+                    TAG,
+                    "Loaded control layout ${resolution.file?.name ?: "<none>"} " +
+                        "(${resolution.layout.layers.sumOf { it.normalButtons.size }} buttons)"
+                )
+            ControlLayoutSelection.Reason.FALLBACK -> {
+                Logger.warning(
+                    TAG,
+                    "Requested control layout ${requested?.name ?: "<none>"} was missing or a collapsed " +
+                        "Pojav import; using valid layout ${resolution.file?.name}."
+                )
+                applySelectionRepairs(resolution)
+            }
+            ControlLayoutSelection.Reason.PRIMARY_KEPT ->
+                Logger.warning(
+                    TAG,
+                    "Control layout ${requested?.name ?: "<none>"} is missing or a collapsed Pojav import " +
+                        "and no valid fallback layout was found; controls may not appear."
+                )
+        }
+        return ResolvedControlLayout(resolution.file, resolution.layout)
     }
 
-    /**
-     * Prefer the globally selected layout, then the most recently modified
-     * valid layout. ControlManager's list is used first because it is already
-     * parsed; a directory scan covers the case where the game starts before the
-     * manager has finished refreshing.
-     */
-    private fun findValidControlLayout(excluded: File?): File? {
-        val excludedPath = excluded?.let { file ->
-            runCatching { file.canonicalPath }.getOrNull()
+    /** Persist selection repairs only after resolution returns to the Main dispatcher. */
+    private fun applySelectionRepairs(result: ControlLayoutSelection.Result) {
+        result.repairGlobalTo?.let { name ->
+            AllSettings.controlLayout.save(name)
+            Logger.warning(TAG, "Updated the global control layout selection to $name.")
         }
-        fun isExcluded(file: File): Boolean {
-            if (excludedPath == null) return false
-            return runCatching { file.canonicalPath }.getOrNull() == excludedPath
-        }
-
-        val globalName = AllSettings.controlLayout.getValue()
-        val candidates = ControlManager.dataList.value
-            .filter { it.isSupport && it.file.exists() && !isExcluded(it.file) }
-            .sortedWith(
-                compareByDescending<ControlData> { it.file.name == globalName }
-                    .thenByDescending { it.file.lastModified() }
-            )
-        candidates.forEach { data ->
-            if (!ControlLayoutSanity.isCollapsedPojavImport(data.controlLayout.pack())) {
-                return data.file
-            }
-        }
-
-        val files = PathManager.DIR_CONTROL_LAYOUTS.listFiles()
-            ?.filter { it.isFile && it.exists() && it.extension.equals("json", true) }
-            ?.filter { !isExcluded(it) }
-            ?.sortedByDescending { it.lastModified() }
-            .orEmpty()
-        files.forEach { file ->
-            val layout = runCatching { loadLayoutFromFile(file) }.getOrNull() ?: return@forEach
-            if (!ControlLayoutSanity.isCollapsedPojavImport(layout)) {
-                return file
-            }
-        }
-        return null
-    }
-
-    /**
-     * Point the global selection (and a per-version override) away from a
-     * collapsed file so the fallback survives the next game launch too.
-     */
-    private fun repairControlSelection(collapsed: File?, fallback: File) {
-        if (collapsed == null) return
-
-        if (AllSettings.controlLayout.getValue() == collapsed.name) {
-            AllSettings.controlLayout.save(fallback.name)
-            Logger.warning(TAG, "Updated the global control layout selection to ${fallback.name}.")
-        }
-
-        val config = version.getVersionConfig()
-        if (config.control == collapsed.name) {
+        if (result.clearVersionOverride) {
+            val config = version.getVersionConfig()
             val previous = config.control
             runCatching {
                 config.control = ""

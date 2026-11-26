@@ -704,7 +704,9 @@ object PojavLayoutConverter {
         buttons.firstOrNull { button ->
             val widthPx = button.buttonSize.widthDp * ctx.density
             val heightPx = button.buttonSize.heightDp * ctx.density
-            widthPx > ctx.screenW + 1f || heightPx > ctx.screenH + 1f
+            // A control that exactly fills an axis leaves zero free space;
+            // toPosition() can only store 0% for that axis, which is a collapse.
+            widthPx >= ctx.screenW.toFloat() || heightPx >= ctx.screenH.toFloat()
         }?.let { button ->
             val widthPx = button.buttonSize.widthDp * ctx.density
             val heightPx = button.buttonSize.heightDp * ctx.density
@@ -717,7 +719,7 @@ object PojavLayoutConverter {
 
         joysticks.firstOrNull { joystick ->
             val sizePx = joystick.sizeDp * ctx.density
-            sizePx > ctx.screenW + 1f || sizePx > ctx.screenH + 1f
+            sizePx >= ctx.screenW.toFloat() || sizePx >= ctx.screenH.toFloat()
         }?.let { joystick ->
             val sizePx = joystick.sizeDp * ctx.density
             throw IllegalArgumentException(

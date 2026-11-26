@@ -28,6 +28,7 @@ import com.movtery.layer_controller.utils.newRandomFileName
 import com.movtery.layer_controller.utils.saveToFile
 import com.movtery.zalithlauncher.context.copyAssetFile
 import com.movtery.zalithlauncher.path.PathManager
+import com.movtery.zalithlauncher.game.version.installed.Version
 import com.movtery.zalithlauncher.setting.AllSettings
 import com.movtery.zalithlauncher.utils.file.readString
 import com.movtery.zalithlauncher.utils.logging.Logger
@@ -216,6 +217,7 @@ object ControlManager {
         catchedError: (Exception) -> Unit,
         onWarnings: (List<String>) -> Unit = {},
         onFinished: () -> Unit = {},
+        targetVersion: Version? = null
     ) = withContext(Dispatchers.IO) {
         val file = getNewRandomFile()
         try {
@@ -249,6 +251,25 @@ object ControlManager {
                     isSupport = true
                 )
                 selectControl(data)
+
+                // Version.getControlPath() prefers versionConfig.control over the global
+                // setting. Without this, importing while a version override is active
+                // leaves gameplay loading the previous (possibly collapsed) file.
+                if (targetVersion != null) {
+                    runCatching {
+                        val config = targetVersion.getVersionConfig()
+                        val previous = config.control
+                        config.control = file.name
+                        config.saveWithThrowable()
+                        Logger.info(
+                            TAG,
+                            "Updated per-version control override from " +
+                                "${previous.ifEmpty { "<none>" }} to ${file.name}."
+                        )
+                    }.onFailure { e ->
+                        Logger.warning(TAG, "Failed to update the per-version control override.", e)
+                    }
+                }
 
                 val normalButtons = layout.layers.flatMap { it.normalButtons }
                 Logger.info(

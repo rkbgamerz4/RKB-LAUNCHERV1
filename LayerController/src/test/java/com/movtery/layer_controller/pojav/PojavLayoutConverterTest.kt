@@ -11,6 +11,8 @@ import com.movtery.layer_controller.data.VisibilityType
 import com.movtery.layer_controller.event.ClickEvent
 import com.movtery.layer_controller.layout.ControlLayout
 import com.movtery.layer_controller.layout.loadLayoutFromString
+import com.movtery.layer_controller.observable.ObservableNormalData
+import com.movtery.layer_controller.utils.getWidgetPosition
 import com.movtery.layer_controller.utils.layoutJson
 import com.movtery.layer_controller.utils.widgetPosition
 import androidx.compose.ui.unit.IntSize
@@ -730,5 +732,58 @@ class PojavLayoutConverterTest {
         val healthy = import(fixture("pojav_v8_default.json")).layout
         assertTrue(ControlLayoutSanity.isPojavImport(healthy))
         assertFalse(ControlLayoutSanity.isCollapsedPojavImport(healthy))
+    }
+
+    @Test
+    fun `v1 v4 and v8 imports render with distinct positions and key mappings`() {
+        val v1 = """
+            {"mControlDataList":[
+              {"name":"A","keycodes":[87,0,0,0],"width":100,"height":100,
+               "dynamicX":"${'$'}{left}","dynamicY":"${'$'}{top}"},
+              {"name":"B","keycodes":[65,0,0,0],"width":100,"height":100,
+               "dynamicX":"${'$'}{right}","dynamicY":"${'$'}{bottom}"},
+              {"name":"C","keycodes":[83,0,0,0],"width":100,"height":100,
+               "dynamicX":"${'$'}{screen_width} / 2","dynamicY":"${'$'}{screen_height} / 2"}
+            ],"scaledAt":100,"version":1}
+        """.trimIndent()
+
+        listOf(
+            "v1" to v1,
+            "v4" to fixture("pojav_v4_user.json"),
+            "v8" to fixture("pojav_v8_default.json")
+        ).forEach { (label, json) ->
+            val layout = import(json).layout
+            val buttons = layout.layers.flatMap { it.normalButtons }
+            assertTrue("$label must import buttons", buttons.size >= 3)
+            assertTrue("$label must keep key mappings", buttons.all { it.clickEvents.isNotEmpty() })
+
+            val rendered = ControlLayoutSanity.renderedNormalButtons(
+                layout, IntSize(WIDTH, HEIGHT), DENSITY
+            )
+            assertEquals(buttons.size, rendered.size)
+            assertTrue(
+                "$label controls must not collapse into one position: $rendered",
+                ControlLayoutSanity.duplicateOffsets(rendered).isEmpty()
+            )
+        }
+    }
+
+    @Test
+    fun `touch hit-test origin matches the rendered control offset`() {
+        val layout = import(fixture("pojav_v8_default.json")).layout
+        val screen = IntSize(WIDTH, HEIGHT)
+        val rendered = ControlLayoutSanity.renderedNormalButtons(layout, screen, DENSITY)
+
+        layout.layers.flatMap { it.normalButtons }.zip(rendered).forEach { (button, control) ->
+            val observable = ObservableNormalData(button)
+            observable.internalRenderSize = control.sizePx
+            val touchOffset = getWidgetPosition(
+                data = observable,
+                widgetSize = observable.internalRenderSize,
+                screenSize = screen
+            )
+            assertEquals("touch x for ${control.label}", control.offset.x, touchOffset.x, 0.5f)
+            assertEquals("touch y for ${control.label}", control.offset.y, touchOffset.y, 0.5f)
+        }
     }
 }

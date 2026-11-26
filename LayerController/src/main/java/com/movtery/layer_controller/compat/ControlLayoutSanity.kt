@@ -61,6 +61,16 @@ object ControlLayoutSanity {
     }
 
     /**
+     * An empty layout is never a valid fallback: loading one after a failed
+     * import looks exactly like "all controls disappeared".
+     */
+    fun hasControls(layout: ControlLayout): Boolean = layout.layers.any { layer ->
+        layer.normalButtons.isNotEmpty() ||
+            layer.textBoxes.isNotEmpty() ||
+            layer.joystickButtons.isNotEmpty()
+    }
+
+    /**
      * Compute the exact offsets the renderer will use for every normal button.
      *
      * `WrapContent` buttons are measured by Compose from their text; without a

@@ -701,7 +701,8 @@ class MainActivity : BaseAppCompatActivity() {
                             },
                             onFinished = {
                                 done = true
-                            }
+                            },
+                            targetVersion = VersionsManager.currentVersion.value
                         )
                     }
                     ControlManager.refresh()
