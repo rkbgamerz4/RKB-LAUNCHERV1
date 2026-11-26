@@ -805,4 +805,112 @@ class PojavLayoutConverterTest {
             assertEquals("touch y for ${control.label}", control.offset.y, touchOffset.y, 0.5f)
         }
     }
+
+    @Test
+    fun `real v8 expressions keep E Ctrl Alt TAB and GUI distinct`() {
+        val layout = import(fixture("pojav_v8_default.json")).layout
+        val buttons = layout.layers.first().normalButtons.associateBy { it.text.default }
+
+        // Values produced by the actual v8 fixture at 2400x1080 @2.75 after
+        // variable substitution, px() conversion and percentage clamping.
+        val expectedPercent = mapOf(
+            "GUI" to (8991 to 0),
+            "TAB" to (0 to 827),
+            "E" to (7623 to 10000),
+            "Ctrl" to (3050 to 0),
+            "Alt" to (3133 to 827)
+        )
+        expectedPercent.forEach { (name, expected) ->
+            val button = buttons.getValue(name)
+            assertEquals("$name x percentage", expected.first.toDouble(), button.position.x.toDouble(), 2.0)
+            assertEquals("$name y percentage", expected.second.toDouble(), button.position.y.toDouble(), 2.0)
+        }
+
+        val rendered = ControlLayoutSanity.renderedNormalButtons(
+            layout, IntSize(WIDTH, HEIGHT), DENSITY
+        ).filter { it.label in expectedPercent }
+        assertEquals(expectedPercent.size, rendered.size)
+        assertEquals(
+            "E/Ctrl/Alt/TAB/GUI must not overlap",
+            expectedPercent.size,
+            rendered.map { it.offset }.distinct().size
+        )
+        assertTrue(
+            "A valid import must not stack every control at the upper-left: $rendered",
+            rendered.any { it.offset.x > 0f && it.offset.y > 0f }
+        )
+    }
+
+    @Test
+    fun `real v8 whitespace variable variants evaluate identically in landscape and portrait`() {
+        val originalJson = fixture("pojav_v8_default.json")
+        val spacedJson = originalJson
+            .replace("\${screen_width}", "\$ {screen_width}")
+            .replace("\${screen_height}", "\$ {screen_height}")
+            .replace("\${preferred_scale}", "\$ {preferred_scale}")
+            .replace("\${margin}", "\$ {margin}")
+
+        listOf(WIDTH to HEIGHT, 1080 to 2400).forEach { (width, height) ->
+            val original = import(originalJson, width, height).layout
+            val spaced = import(spacedJson, width, height).layout
+            val before = ControlLayoutSanity.renderedNormalButtons(
+                original, IntSize(width, height), DENSITY
+            )
+            val after = ControlLayoutSanity.renderedNormalButtons(
+                spaced, IntSize(width, height), DENSITY
+            )
+
+            assertEquals(before.size, after.size)
+            before.zip(after).forEach { (a, b) ->
+                assertEquals("${a.label} x", a.offset.x, b.offset.x, 0.5f)
+                assertEquals("${a.label} y", a.offset.y, b.offset.y, 0.5f)
+                assertEquals(a.sizePx, b.sizePx)
+            }
+            assertTrue(
+                "$width x $height whitespace variant must not overlap: $after",
+                ControlLayoutSanity.duplicateOffsets(after).isEmpty()
+            )
+        }
+
+        val reloaded = loadLayoutFromString(
+            layoutJson.encodeToString(ControlLayout.serializer(), import(spacedJson).layout)
+        )
+        val rendered = ControlLayoutSanity.renderedNormalButtons(
+            reloaded, IntSize(WIDTH, HEIGHT), DENSITY
+        )
+        assertTrue(
+            "Whitespace-variant import must survive serialization: $rendered",
+            ControlLayoutSanity.duplicateOffsets(rendered).isEmpty()
+        )
+    }
+
+    @Test
+    fun `unknown variable expression is reported instead of a top-left fallback`() {
+        val json = """
+            {"mControlDataList":[
+              {"name":"A","keycodes":[87,0,0,0],"width":80,"height":30,
+               "dynamicX":"${'$'} {unknown_variable} + 1","x":0,"dynamicY":"0","y":0},
+              {"name":"B","keycodes":[65,0,0,0],"width":80,"height":30,
+               "dynamicX":"${'$'}{unknown_variable} + 2","x":0,"dynamicY":"0","y":0}
+            ],"scaledAt":100,"version":8}
+        """.trimIndent()
+
+        try {
+            import(json)
+            fail("Unknown Pojav variables must fail the import")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(
+                "Error must name the button: ${e.message}",
+                e.message!!.contains("Button \"A\"")
+            )
+            assertTrue(
+                "Error must name the unsupported token: ${e.message}",
+                e.message!!.contains("unknown variable \${unknown_variable}")
+            )
+            assertTrue(
+                "Error must include the original expression: ${e.message}",
+                e.message!!.contains("\$ {unknown_variable} + 1")
+            )
+        }
+    }
 }

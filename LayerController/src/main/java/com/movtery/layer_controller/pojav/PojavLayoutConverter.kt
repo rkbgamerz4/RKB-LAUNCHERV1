@@ -756,12 +756,13 @@ object PojavLayoutConverter {
 
     /**
      * Evaluate Pojav's dynamicX/dynamicY expression in pixels, falling back to
-     * the legacy absolute x/y field when there is no usable expression.
+     * the legacy absolute x/y field only when no expression is supplied.
      *
      * Legacy x/y values are absolute pixels in v1/v2 layouts, but some converted
      * layouts store an expression string there instead of a number. Both forms
-     * are evaluated; a position is never silently replaced by zero while any
-     * usable source value exists.
+     * are evaluated. An expression that cannot be evaluated is a hard error: it
+     * must never be replaced by zero, because that stacks every affected button
+     * in the upper-left corner and hides the actual Pojav syntax problem.
      */
     private fun evalPos(
         dynamic: JsonElement?,
@@ -781,24 +782,30 @@ object PojavLayoutConverter {
             "margin" to margin, "preferred_scale" to 100f
         )
 
-        fun evaluate(element: JsonElement?): Float? {
+        fun evaluate(element: JsonElement?, sourceName: String): Float? {
             val primitive = element as? JsonPrimitive ?: return null
             val text = primitive.contentOrNull?.trim().orEmpty()
             if (text.isEmpty()) return null
             return try {
                 ExprEval(text, vars, ctx.density).evaluate()
             } catch (e: Exception) {
-                warnings += "Button \"$name\": could not evaluate position \"$text\" " +
-                    "(${e.message ?: "invalid expression"})."
-                null
+                throw IllegalArgumentException(
+                    "Button \"$name\": invalid Pojav $sourceName expression \"$text\": " +
+                        (e.message ?: "invalid expression"),
+                    e
+                )
             }
         }
 
-        evaluate(dynamic)?.let { return it }
-        evaluate(legacy)?.let { return it }
+        evaluate(dynamic, "dynamicX/dynamicY")?.let { return it }
+        evaluate(legacy, "x/y")?.let { return it }
 
-        warnings += "Button \"$name\" has no usable Pojav position; it was placed at the top-left."
-        return 0f
+        val dynamicText = dynamic?.toString() ?: "<none>"
+        val legacyText = legacy?.toString() ?: "<none>"
+        throw IllegalArgumentException(
+            "Button \"$name\" has no usable Pojav position " +
+                "(dynamic=$dynamicText, x=$legacyText); refusing to place it at (0,0)."
+        )
     }
 
     // ---------------------------------------------------------------- export
@@ -957,21 +964,62 @@ object PojavLayoutConverter {
  * Arithmetic evaluator for Pojav dynamic positions. Mirrors the operators and
  * helpers exposed by Pojav's expression parser (exp4j): + - * / % ^, the
  * dp/px conversion helpers, the trigonometric/exponential functions and the
- * `pi` / `e` constants. All whitespace is ignored, matching Pojav's JSONUtils
- * substitution + exp4j evaluation.
+ * `pi` / `e` constants.
+ *
+ * Variable substitution is an explicit scanner, not a regular expression.
+ * Android's regex engine rejects an unescaped closing brace in `\$\{(\w+)}`
+ * with "Syntax error in regexp pattern near index 10", even though desktop JVM
+ * tests accept it. The scanner also accepts real-world whitespace variants
+ * such as `$ {screen_width}` while preserving evaluation order: every value is
+ * inserted as a parenthesized literal before arithmetic is parsed.
  */
 private class ExprEval(src: String, vars: Map<String, Float>, private val density: Float) {
     private val s: String
     private var pos = 0
 
     init {
-        val re = Regex("\\$\\{(\\w+)}")
-        val text = re.replace(src) { m ->
-            val v = vars[m.groupValues[1]]
-                ?: throw IllegalArgumentException("unknown variable \${${m.groupValues[1]}}")
-            "(" + v.toString() + ")"
+        s = substituteVariables(src, vars).filterNot { it.isWhitespace() }
+    }
+
+    private fun substituteVariables(source: String, variables: Map<String, Float>): String {
+        val out = StringBuilder(source.length)
+        var i = 0
+        while (i < source.length) {
+            if (source[i] != '$') {
+                out.append(source[i])
+                i++
+                continue
+            }
+
+            val dollar = i
+            i++
+            while (i < source.length && source[i].isWhitespace()) i++
+            if (i >= source.length || source[i] != '{') {
+                throw IllegalArgumentException(
+                    "unsupported '\$' at index $dollar: expected \${name} or \$ {name}"
+                )
+            }
+            i++
+
+            while (i < source.length && source[i].isWhitespace()) i++
+            val nameStart = i
+            while (i < source.length && (source[i].isLetterOrDigit() || source[i] == '_')) i++
+            if (i == nameStart) {
+                throw IllegalArgumentException("empty variable at index $dollar")
+            }
+            val name = source.substring(nameStart, i)
+
+            while (i < source.length && source[i].isWhitespace()) i++
+            if (i >= source.length || source[i] != '}') {
+                throw IllegalArgumentException("unterminated variable \${$name}")
+            }
+            i++
+
+            val value = variables[name]
+                ?: throw IllegalArgumentException("unknown variable \${$name}")
+            out.append('(').append(value).append(')')
         }
-        s = text.filterNot { it.isWhitespace() }
+        return out.toString()
     }
 
     fun evaluate(): Float {
