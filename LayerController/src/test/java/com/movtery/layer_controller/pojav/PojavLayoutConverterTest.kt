@@ -229,10 +229,14 @@ class PojavLayoutConverterTest {
     fun `unsupported specials become visual-only buttons with warnings`() {
         val json = """
             {"mControlDataList":[
-              {"name":"GUI","keycodes":[-2,0,0,0],"width":50,"height":50},
-              {"name":"Mouse","keycodes":[-5,0,0,0],"width":50,"height":50},
-              {"name":"Pan","keycodes":[-10,0,0,0],"width":50,"height":50},
-              {"name":"W","keycodes":[87,0,0,0],"width":50,"height":50}
+              {"name":"GUI","keycodes":[-2,0,0,0],"width":50,"height":50,
+               "dynamicX":"${'$'}{margin}","dynamicY":"${'$'}{margin}"},
+              {"name":"Mouse","keycodes":[-5,0,0,0],"width":50,"height":50,
+               "dynamicX":"${'$'}{right} - ${'$'}{width} - ${'$'}{margin}","dynamicY":"${'$'}{margin}"},
+              {"name":"Pan","keycodes":[-10,0,0,0],"width":50,"height":50,
+               "dynamicX":"${'$'}{margin}","dynamicY":"${'$'}{bottom} - ${'$'}{height} - ${'$'}{margin}"},
+              {"name":"W","keycodes":[87,0,0,0],"width":50,"height":50,
+               "dynamicX":"${'$'}{screen_width} / 2","dynamicY":"${'$'}{screen_height} / 2"}
             ],"scaledAt":100,"version":8}
         """.trimIndent()
         val result = import(json)
@@ -524,7 +528,8 @@ class PojavLayoutConverterTest {
                  "dynamicY":"0.5 * ${'$'}{screen_height}",
                  "width":40,"height":40},
                "buttonProperties":[
-                 {"name":"Child","keycodes":[65,0,0,0],"width":20,"height":20}
+                 {"name":"Child","keycodes":[65,0,0,0],"width":20,"height":20,
+                  "dynamicX":"${'$'}{margin}","dynamicY":"${'$'}{margin}"}
                ]}
             ],"scaledAt":100,"version":8}
         """.trimIndent()
