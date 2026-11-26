@@ -238,6 +238,26 @@ object ControlManager {
                 }
                 val layout = imported?.layout ?: loadLayoutFromString(jsonString)
                 layout.saveToFile(file)
+
+                // Saving alone is not enough: gameplay resolves the layout from
+                // the global/per-version selection, so an imported file that is
+                // never selected leaves the previous (possibly collapsed)
+                // layout active. Select the freshly imported file immediately.
+                val data = ControlData(
+                    file = file,
+                    controlLayout = ObservableControlLayout(layout),
+                    isSupport = true
+                )
+                selectControl(data)
+
+                val normalButtons = layout.layers.flatMap { it.normalButtons }
+                Logger.info(
+                    TAG,
+                    "Imported control layout ${file.name} from " +
+                        "${geometry.widthPx}x${geometry.heightPx}px @${geometry.density}; " +
+                        "buttons=${normalButtons.size}, " +
+                        "distinctPositions=${normalButtons.map { it.position }.distinct().size}"
+                )
             }
             onFinished()
         } catch (e: SerializationException) {

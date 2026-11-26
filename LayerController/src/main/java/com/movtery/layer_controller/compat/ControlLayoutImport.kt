@@ -8,6 +8,9 @@
 package com.movtery.layer_controller.compat
 
 import android.content.Context
+import android.os.Build
+import android.util.DisplayMetrics
+import android.view.WindowManager
 import com.movtery.layer_controller.layout.ControlLayout
 import com.movtery.layer_controller.pojav.PojavLayoutConverter
 import kotlin.math.roundToInt
@@ -71,15 +74,40 @@ data class ControlImportGeometry(
          * `widthPixels == heightPixels == 0`; the old importer then divided by a
          * zero-sized free area and placed every control at `(0, 0)`.
          *
-         * The application `Resources` follows the current window/display
-         * configuration, and the configuration values are used as a fallback if
-         * the metrics are ever incomplete.
+         * Prefer the window manager's real window bounds. Application
+         * `Resources` can be reduced to the current app window and, on some
+         * devices, still report a stale or zero size. The resource metrics and
+         * configuration remain as a fallback for non-visual contexts.
          */
         fun fromContext(context: Context): ControlImportGeometry {
             val metrics = context.resources.displayMetrics
             var width = metrics.widthPixels
             var height = metrics.heightPixels
             var density = metrics.density
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val windowManager = context.getSystemService(WindowManager::class.java)
+                val bounds = windowManager?.currentWindowMetrics?.bounds
+                if (bounds != null && bounds.width() > 0 && bounds.height() > 0) {
+                    width = bounds.width()
+                    height = bounds.height()
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+                if (windowManager != null) {
+                    val realMetrics = DisplayMetrics()
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay.getRealMetrics(realMetrics)
+                    if (realMetrics.widthPixels > 0 && realMetrics.heightPixels > 0) {
+                        width = realMetrics.widthPixels
+                        height = realMetrics.heightPixels
+                    }
+                    if (realMetrics.density > 0f) {
+                        density = realMetrics.density
+                    }
+                }
+            }
 
             if (width <= 0 || height <= 0 || density <= 0f) {
                 val configuration = context.resources.configuration

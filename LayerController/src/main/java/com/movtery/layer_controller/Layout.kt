@@ -19,6 +19,7 @@
 package com.movtery.layer_controller
 
 import androidx.annotation.FloatRange
+import android.util.Log
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -47,6 +48,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.movtery.layer_controller.compat.ControlLayoutSanity
+import com.movtery.layer_controller.compat.RenderedControl
 import com.movtery.layer_controller.data.HideLayerWhen
 import com.movtery.layer_controller.data.VisibilityType
 import com.movtery.layer_controller.event.EventHandler
@@ -55,7 +58,10 @@ import com.movtery.layer_controller.layout.TextButton
 import com.movtery.layer_controller.observable.ObservableButtonStyle
 import com.movtery.layer_controller.observable.ObservableControlLayer
 import com.movtery.layer_controller.observable.ObservableControlLayout
+import com.movtery.layer_controller.observable.ObservableJoystickData
 import com.movtery.layer_controller.observable.ObservableJoystickStyle
+import com.movtery.layer_controller.observable.ObservableNormalData
+import com.movtery.layer_controller.observable.ObservableTextData
 import com.movtery.layer_controller.observable.ObservableWidget
 import com.movtery.layer_controller.observable.PointerEventBus
 import com.movtery.layer_controller.observable.TouchProcessor
@@ -83,6 +89,7 @@ fun ControlBoxLayout(
     onReleasePointer: (PointerId) -> Unit = {},
     hideLayerWhen: HideLayerWhen = HideLayerWhen.None,
     isDark: Boolean = isSystemInDarkTheme(),
+    debugDiagnostics: Boolean = false,
     content: @Composable BoxScope.() -> Unit
 ) {
     when {
@@ -114,6 +121,7 @@ fun ControlBoxLayout(
                             isCursorGrabbing = isCursorGrabbing,
                             hideLayerWhen = hideLayerWhen,
                             isDark = isDark,
+                            debugDiagnostics = debugDiagnostics,
                             content = content
                         )
                     }
@@ -139,6 +147,7 @@ private fun BoxWithConstraintsScope.BaseControlBoxLayout(
     isCursorGrabbing: Boolean,
     hideLayerWhen: HideLayerWhen,
     isDark: Boolean,
+    debugDiagnostics: Boolean,
     content: @Composable BoxScope.() -> Unit
 ) {
     val layers by observedLayout.layers.collectAsStateWithLifecycle()
@@ -230,7 +239,8 @@ private fun BoxWithConstraintsScope.BaseControlBoxLayout(
             isCursorGrabbing = currentIsCursorGrabbing,
             hideLayerWhen = currentHideLayerWhen,
             onOccupiedPointer = onOccupiedPointer,
-            onReleasePointer = onReleasePointer
+            onReleasePointer = onReleasePointer,
+            debugDiagnostics = debugDiagnostics
         )
     }
 }
@@ -248,7 +258,8 @@ private fun ControlsRendererLayer(
     isCursorGrabbing: Boolean,
     hideLayerWhen: HideLayerWhen,
     onOccupiedPointer: (PointerId) -> Unit,
-    onReleasePointer: (PointerId) -> Unit
+    onReleasePointer: (PointerId) -> Unit,
+    debugDiagnostics: Boolean
 ) {
     Layout(
         modifier = Modifier.alpha(alpha = opacity),
@@ -333,23 +344,40 @@ private fun ControlsRendererLayer(
 
         layout(constraints.maxWidth, constraints.maxHeight) {
             var placeableIndex = 0
-            fun ObservableWidget.place() {
+            val diagnostics = if (debugDiagnostics) ArrayList<RenderedControl>() else null
+
+            fun ObservableWidget.place(layerName: String) {
                 if (placeableIndex < placeables.size) {
                     val placeable = placeables[placeableIndex]
+                    val widgetSize = IntSize(placeable.width, placeable.height)
                     val position = getWidgetPosition(
                         data = this,
-                        widgetSize = IntSize(placeable.width, placeable.height),
+                        widgetSize = widgetSize,
                         screenSize = screenSize
                     )
                     placeable.place(position.x.toInt(), position.y.toInt())
+                    if (diagnostics != null) {
+                        diagnostics += RenderedControl(
+                            layer = layerName,
+                            label = diagnosticLabel(),
+                            uuid = diagnosticUuid(),
+                            position = internalRenderPosition,
+                            sizePx = widgetSize,
+                            offset = position
+                        )
+                    }
                     placeableIndex++
                 }
             }
 
             layers.fastForEach { layer ->
-                layer.textBoxes.value.fastForEach { it.place() }
-                layer.normalButtons.value.fastForEach { it.place() }
-                layer.joystickButtons.value.fastForEach { it.place() }
+                layer.textBoxes.value.fastForEach { it.place(layer.name) }
+                layer.normalButtons.value.fastForEach { it.place(layer.name) }
+                layer.joystickButtons.value.fastForEach { it.place(layer.name) }
+            }
+
+            if (diagnostics != null) {
+                logRenderedControls(screenSize, diagnostics)
             }
         }
     }
@@ -412,5 +440,51 @@ private fun checkVisibility(
         VisibilityType.ALWAYS -> true
         VisibilityType.IN_GAME -> isCursorGrabbing
         VisibilityType.IN_MENU -> !isCursorGrabbing
+    }
+}
+
+// --------------------------------------------------------- debug diagnostics
+
+private const val DIAGNOSTICS_TAG = "RKBControls"
+
+private fun ObservableWidget.diagnosticLabel(): String = when (this) {
+    is ObservableNormalData -> text.default
+    is ObservableTextData -> text.default
+    is ObservableJoystickData -> "joystick"
+    else -> this::class.simpleName ?: "widget"
+}
+
+private fun ObservableWidget.diagnosticUuid(): String = when (this) {
+    is ObservableNormalData -> uuid
+    is ObservableTextData -> uuid
+    is ObservableJoystickData -> uuid
+    else -> ""
+}
+
+/**
+ * Structured log of the final rendered geometry. Enabled from the game screen
+ * in debug builds; it reports the viewport and every control's stored
+ * percentage, measured size and final pixel offset, and warns when controls
+ * share an offset.
+ */
+private fun logRenderedControls(screenSize: IntSize, controls: List<RenderedControl>) {
+    Log.d(DIAGNOSTICS_TAG, "viewport=${screenSize.width}x${screenSize.height} controls=${controls.size}")
+    controls.forEach { control ->
+        Log.d(
+            DIAGNOSTICS_TAG,
+            "layer=${control.layer} label=\"${control.label}\" uuid=${control.uuid} " +
+                "position=(${control.position.x},${control.position.y}) " +
+                "size=${control.sizePx.width}x${control.sizePx.height} " +
+                "rendered=(${control.offset.x.toInt()},${control.offset.y.toInt()})"
+        )
+    }
+    val duplicates = ControlLayoutSanity.duplicateOffsets(controls)
+    if (duplicates.isNotEmpty()) {
+        val description = duplicates.joinToString("; ") { group ->
+            group.joinToString(", ") { control ->
+                "${control.layer}/${control.label}@${control.offset.x.toInt()},${control.offset.y.toInt()}"
+            }
+        }
+        Log.w(DIAGNOSTICS_TAG, "Duplicate rendered coordinates: $description")
     }
 }

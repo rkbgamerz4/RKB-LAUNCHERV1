@@ -4,6 +4,7 @@
 package com.movtery.layer_controller.pojav
 
 import com.movtery.layer_controller.compat.ControlImportGeometry
+import com.movtery.layer_controller.compat.ControlLayoutSanity
 import com.movtery.layer_controller.data.JoystickTriggerMode
 import com.movtery.layer_controller.data.NormalData
 import com.movtery.layer_controller.data.VisibilityType
@@ -14,6 +15,7 @@ import com.movtery.layer_controller.utils.layoutJson
 import com.movtery.layer_controller.utils.widgetPosition
 import androidx.compose.ui.unit.IntSize
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -566,5 +568,167 @@ class PojavLayoutConverterTest {
 
         val result = import(json)
         assertTrue(result.warnings.any { it.contains("same position") })
+    }
+
+    // ------------------------------------------------- full pipeline checks
+
+    @Test
+    fun `full pipeline import save reload and render keeps distinct coordinates`() {
+        val original = import(fixture("pojav_v8_default.json")).layout
+        val encoded = layoutJson.encodeToString(ControlLayout.serializer(), original)
+        val reloaded = loadLayoutFromString(encoded)
+        val screen = IntSize(WIDTH, HEIGHT)
+
+        val before = ControlLayoutSanity.renderedNormalButtons(original, screen, DENSITY)
+        val after = ControlLayoutSanity.renderedNormalButtons(reloaded, screen, DENSITY)
+
+        assertEquals(19, before.size)
+        assertEquals(before.size, after.size)
+        before.zip(after).forEach { (a, b) ->
+            assertEquals("label ${a.label}", a.label, b.label)
+            assertEquals(a.offset.x, b.offset.x, 0.5f)
+            assertEquals(a.offset.y, b.offset.y, 0.5f)
+            assertEquals(a.sizePx, b.sizePx)
+        }
+        assertTrue(
+            "Reloaded controls must not share rendered coordinates: $after",
+            ControlLayoutSanity.duplicateOffsets(after).isEmpty()
+        )
+        assertEquals(19, after.map { it.offset }.distinct().size)
+    }
+
+    @Test
+    fun `export reimport and render preserves coordinates`() {
+        val original = import(fixture("pojav_v8_default.json")).layout
+        val exported = PojavLayoutConverter.exportToPojav(original, WIDTH, HEIGHT, DENSITY)
+        val reimported = import(exported.json).layout
+        val screen = IntSize(WIDTH, HEIGHT)
+
+        val before = ControlLayoutSanity.renderedNormalButtons(original, screen, DENSITY)
+        val after = ControlLayoutSanity.renderedNormalButtons(reimported, screen, DENSITY)
+
+        assertEquals(before.size, after.size)
+        before.zip(after).forEachIndexed { index, (a, b) ->
+            assertEquals("exported label $index", a.label, b.label)
+            assertEquals("exported x $index", a.offset.x, b.offset.x, 2f)
+            assertEquals("exported y $index", a.offset.y, b.offset.y, 2f)
+        }
+        assertTrue(
+            "Reimported controls must not share rendered coordinates: $after",
+            ControlLayoutSanity.duplicateOffsets(after).isEmpty()
+        )
+    }
+
+    @Test
+    fun `corner anchors survive viewports densities and portrait normalization`() {
+        val json = """
+            {"mControlDataList":[
+              {"name":"TopLeft","keycodes":[87,0,0,0],"width":40,"height":30,
+               "dynamicX":"${'$'}{left}","dynamicY":"${'$'}{top}"},
+              {"name":"TopRight","keycodes":[65,0,0,0],"width":40,"height":30,
+               "dynamicX":"${'$'}{right}","dynamicY":"${'$'}{top}"},
+              {"name":"BottomLeft","keycodes":[83,0,0,0],"width":40,"height":30,
+               "dynamicX":"${'$'}{left}","dynamicY":"${'$'}{bottom}"},
+              {"name":"BottomRight","keycodes":[68,0,0,0],"width":40,"height":30,
+               "dynamicX":"${'$'}{right}","dynamicY":"${'$'}{bottom}"}
+            ],"scaledAt":100,"version":8}
+        """.trimIndent()
+
+        listOf(
+            ControlImportGeometry.fromDisplayMetrics(2400, 1080, 2.75f),
+            ControlImportGeometry.fromDisplayMetrics(1920, 1080, 2.0f),
+            ControlImportGeometry.fromDisplayMetrics(1280, 720, 1.5f),
+            // Portrait metrics must be normalised to a landscape import viewport.
+            ControlImportGeometry.fromDisplayMetrics(1080, 2400, 3.0f)
+        ).forEach { geometry ->
+            val layout = PojavLayoutConverter.importPojav(
+                jsonString = json,
+                screenWidthPx = geometry.widthPx,
+                screenHeightPx = geometry.heightPx,
+                density = geometry.density,
+                layoutName = "corners"
+            ).layout
+            val rendered = ControlLayoutSanity.renderedNormalButtons(
+                layout,
+                IntSize(geometry.widthPx, geometry.heightPx),
+                geometry.density
+            )
+            assertEquals(4, rendered.size)
+
+            fun offset(label: String) = rendered.first { it.label == label }.offset
+            val widthPx = 40f * geometry.density
+            val heightPx = 30f * geometry.density
+
+            val topLeft = offset("TopLeft")
+            assertEquals("top-left x", 0f, topLeft.x, 0.5f)
+            assertEquals("top-left y", 0f, topLeft.y, 0.5f)
+
+            val topRight = offset("TopRight")
+            assertEquals("top-right x", geometry.widthPx - widthPx, topRight.x, 1f)
+            assertEquals("top-right y", 0f, topRight.y, 0.5f)
+
+            val bottomLeft = offset("BottomLeft")
+            assertEquals("bottom-left x", 0f, bottomLeft.x, 0.5f)
+            assertEquals("bottom-left y", geometry.heightPx - heightPx, bottomLeft.y, 1f)
+
+            val bottomRight = offset("BottomRight")
+            assertEquals("bottom-right x", geometry.widthPx - widthPx, bottomRight.x, 1f)
+            assertEquals("bottom-right y", geometry.heightPx - heightPx, bottomRight.y, 1f)
+
+            assertTrue(
+                "Four corners must not overlap at ${geometry.widthPx}x${geometry.heightPx}",
+                ControlLayoutSanity.duplicateOffsets(rendered).isEmpty()
+            )
+        }
+    }
+
+    @Test
+    fun `a viewport too small for its buttons is rejected instead of collapsing them`() {
+        val json = fixture("pojav_v8_default.json")
+        listOf(1, 100, 200).forEach { size ->
+            try {
+                import(json, width = size, height = size)
+                fail("Expected a ${size}x${size}px viewport to be rejected")
+            } catch (e: IllegalArgumentException) {
+                assertTrue(
+                    "Unexpected error message: ${e.message}",
+                    e.message!!.contains("viewport") && e.message!!.contains("too small")
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `collapsed pojav imports are detected while healthy layouts are not`() {
+        val json = """
+            {"mControlDataList":[
+              {"name":"A","keycodes":[87,0,0,0],"width":50,"height":50,
+               "dynamicX":"0","dynamicY":"0"},
+              {"name":"B","keycodes":[65,0,0,0],"width":50,"height":50,
+               "dynamicX":"0","dynamicY":"0"}
+            ],"scaledAt":100,"version":8}
+        """.trimIndent()
+        val collapsed = import(json).layout
+
+        assertTrue(ControlLayoutSanity.isPojavImport(collapsed))
+        assertTrue(ControlLayoutSanity.isCollapsedPojavImport(collapsed))
+
+        // The runtime guard loads the file from disk, so detection must survive
+        // the same save/reload round-trip used by the control manager.
+        val reloaded = loadLayoutFromString(
+            layoutJson.encodeToString(ControlLayout.serializer(), collapsed)
+        )
+        assertTrue(ControlLayoutSanity.isCollapsedPojavImport(reloaded))
+
+        val rendered = ControlLayoutSanity.renderedNormalButtons(
+            collapsed, IntSize(WIDTH, HEIGHT), DENSITY
+        )
+        val duplicates = ControlLayoutSanity.duplicateOffsets(rendered)
+        assertEquals(1, duplicates.size)
+        assertEquals(2, duplicates.first().size)
+
+        val healthy = import(fixture("pojav_v8_default.json")).layout
+        assertTrue(ControlLayoutSanity.isPojavImport(healthy))
+        assertFalse(ControlLayoutSanity.isCollapsedPojavImport(healthy))
     }
 }

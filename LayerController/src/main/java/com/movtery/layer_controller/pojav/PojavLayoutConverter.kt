@@ -274,6 +274,11 @@ object PojavLayoutConverter {
             }
         }
 
+        // A viewport that cannot fit a control is never a usable import
+        // viewport. Reject it instead of saving positions that every renderer
+        // will clamp to the upper-left corner.
+        requireViewportFits(ctx, mainButtons, mainJoysticks)
+
         // A valid Pojav layout almost never has two controls at exactly the same
         // percentage. If everything collapsed, the import viewport was wrong.
         // Report it instead of silently producing overlapping controls.
@@ -683,6 +688,43 @@ object PojavLayoutConverter {
             if (ev != null && ev !in out) out += ev
         }
         return out
+    }
+
+    /**
+     * Reject a viewport that is smaller than the controls it is supposed to
+     * contain. Such a viewport produces free space <= 0 for every control and
+     * `toPosition` can only place them at (0, 0), which is the reported
+     * "everything stacked in the upper-left corner" failure.
+     */
+    private fun requireViewportFits(
+        ctx: Ctx,
+        buttons: List<NormalData>,
+        joysticks: List<JoystickData>
+    ) {
+        buttons.firstOrNull { button ->
+            val widthPx = button.buttonSize.widthDp * ctx.density
+            val heightPx = button.buttonSize.heightDp * ctx.density
+            widthPx > ctx.screenW + 1f || heightPx > ctx.screenH + 1f
+        }?.let { button ->
+            val widthPx = button.buttonSize.widthDp * ctx.density
+            val heightPx = button.buttonSize.heightDp * ctx.density
+            throw IllegalArgumentException(
+                "Import viewport ${ctx.screenW}x${ctx.screenH}px is too small for button " +
+                    "\"${button.text.default}\" (${format(widthPx)}x${format(heightPx)}px). " +
+                    "Refusing to save a control layout that cannot be displayed."
+            )
+        }
+
+        joysticks.firstOrNull { joystick ->
+            val sizePx = joystick.sizeDp * ctx.density
+            sizePx > ctx.screenW + 1f || sizePx > ctx.screenH + 1f
+        }?.let { joystick ->
+            val sizePx = joystick.sizeDp * ctx.density
+            throw IllegalArgumentException(
+                "Import viewport ${ctx.screenW}x${ctx.screenH}px is too small for joystick " +
+                    "(${format(sizePx)}px). Refusing to save a control layout that cannot be displayed."
+            )
+        }
     }
 
     private fun toPosition(

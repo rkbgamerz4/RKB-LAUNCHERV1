@@ -64,6 +64,7 @@ import com.movtery.inputmap.keycodes.LwjglGlfwKeycode
 import com.movtery.inputmap.keycodes.OPEN_CHAT
 import com.movtery.inputmap.keycodes.OPEN_CHAT_VALUE
 import com.movtery.layer_controller.ControlBoxLayout
+import com.movtery.layer_controller.compat.ControlLayoutSanity
 import com.movtery.layer_controller.data.HideLayerWhen
 import com.movtery.layer_controller.event.ClickEvent
 import com.movtery.layer_controller.event.EventHandler
@@ -71,18 +72,22 @@ import com.movtery.layer_controller.layout.ControlLayout
 import com.movtery.layer_controller.layout.EmptyControlLayout
 import com.movtery.layer_controller.layout.loadLayoutFromFile
 import com.movtery.layer_controller.observable.ObservableControlLayout
+import com.movtery.zalithlauncher.BuildConfig
 import com.movtery.zalithlauncher.R
 import com.movtery.zalithlauncher.bridge.CURSOR_DISABLED
 import com.movtery.zalithlauncher.bridge.ZLBridgeStates
 import com.movtery.zalithlauncher.bridge.ZLNativeInvoker
 import com.movtery.zalithlauncher.game.input.LWJGLCharSender
 import com.movtery.zalithlauncher.game.keycodes.mapToKeycode
+import com.movtery.zalithlauncher.game.control.ControlData
+import com.movtery.zalithlauncher.game.control.ControlManager
 import com.movtery.zalithlauncher.game.launch.handler.GameHandler
 import com.movtery.zalithlauncher.game.sdl.SdlBridge
 import com.movtery.zalithlauncher.game.sdl.SdlTextSender
 import com.movtery.zalithlauncher.game.support.touch_controller.touchControllerInputModifier
 import com.movtery.zalithlauncher.game.support.touch_controller.touchControllerTouchModifier
 import com.movtery.zalithlauncher.game.version.installed.Version
+import com.movtery.zalithlauncher.path.PathManager
 import com.movtery.zalithlauncher.setting.AllSettings
 import com.movtery.zalithlauncher.setting.enums.isLauncherInDarkTheme
 import com.movtery.zalithlauncher.setting.enums.toAction
@@ -336,13 +341,116 @@ private class GameViewModel(
         layoutMutex.withLock {
             withContext(Dispatchers.Main) {
                 observableLayout = null
-                val layout = withContext(Dispatchers.IO) {
+                val resolved = withContext(Dispatchers.IO) {
                     delay(10L.milliseconds) //刻意等待一会再加载
-                    currentControlFile = layoutFile
-                    getLayout(layoutFile)
+                    resolveControlLayout(layoutFile)
                 }
+                currentControlFile = resolved.file
                 //将控制布局加载为可供Compose加载的形式
-                observableLayout = ObservableControlLayout(layout)
+                observableLayout = ObservableControlLayout(resolved.layout)
+            }
+        }
+    }
+
+    private data class ResolvedControlLayout(val file: File?, val layout: ControlLayout)
+
+    /**
+     * Load the requested layout, but never render a collapsed Pojav import.
+     *
+     * Old versions saved imports without selecting them and could save every
+     * control at (0,0) when the import viewport was unusable. Such a file may
+     * still be the selected/global/per-version layout on existing installs, so
+     * gameplay has to recover instead of drawing all controls in one corner.
+     */
+    private fun resolveControlLayout(requested: File?): ResolvedControlLayout {
+        val primary = requested ?: version.getControlPath()
+        val primaryLayout = getLayout(primary)
+        if (!ControlLayoutSanity.isCollapsedPojavImport(primaryLayout)) {
+            return ResolvedControlLayout(primary, primaryLayout)
+        }
+
+        val buttonCount = primaryLayout.layers.flatMap { it.normalButtons }.size
+        Logger.warning(
+            TAG,
+            "Control layout ${primary?.absolutePath ?: "<none>"} is a collapsed Pojav import " +
+                "($buttonCount buttons share one position); searching for a valid fallback."
+        )
+        val fallback = findValidControlLayout(primary)
+        if (fallback == null) {
+            Logger.warning(TAG, "No valid fallback control layout found; keeping the requested layout.")
+            return ResolvedControlLayout(primary, primaryLayout)
+        }
+
+        val fallbackLayout = getLayout(fallback)
+        Logger.warning(TAG, "Using valid fallback control layout ${fallback.absolutePath}.")
+        repairControlSelection(primary, fallback)
+        return ResolvedControlLayout(fallback, fallbackLayout)
+    }
+
+    /**
+     * Prefer the globally selected layout, then the most recently modified
+     * valid layout. ControlManager's list is used first because it is already
+     * parsed; a directory scan covers the case where the game starts before the
+     * manager has finished refreshing.
+     */
+    private fun findValidControlLayout(excluded: File?): File? {
+        val excludedPath = excluded?.let { file ->
+            runCatching { file.canonicalPath }.getOrNull()
+        }
+        fun isExcluded(file: File): Boolean {
+            if (excludedPath == null) return false
+            return runCatching { file.canonicalPath }.getOrNull() == excludedPath
+        }
+
+        val globalName = AllSettings.controlLayout.getValue()
+        val candidates = ControlManager.dataList.value
+            .filter { it.isSupport && it.file.exists() && !isExcluded(it.file) }
+            .sortedWith(
+                compareByDescending<ControlData> { it.file.name == globalName }
+                    .thenByDescending { it.file.lastModified() }
+            )
+        candidates.forEach { data ->
+            if (!ControlLayoutSanity.isCollapsedPojavImport(data.controlLayout.pack())) {
+                return data.file
+            }
+        }
+
+        val files = PathManager.DIR_CONTROL_LAYOUTS.listFiles()
+            ?.filter { it.isFile && it.exists() && it.extension.equals("json", true) }
+            ?.filter { !isExcluded(it) }
+            ?.sortedByDescending { it.lastModified() }
+            .orEmpty()
+        files.forEach { file ->
+            val layout = runCatching { loadLayoutFromFile(file) }.getOrNull() ?: return@forEach
+            if (!ControlLayoutSanity.isCollapsedPojavImport(layout)) {
+                return file
+            }
+        }
+        return null
+    }
+
+    /**
+     * Point the global selection (and a per-version override) away from a
+     * collapsed file so the fallback survives the next game launch too.
+     */
+    private fun repairControlSelection(collapsed: File?, fallback: File) {
+        if (collapsed == null) return
+
+        if (AllSettings.controlLayout.getValue() == collapsed.name) {
+            AllSettings.controlLayout.save(fallback.name)
+            Logger.warning(TAG, "Updated the global control layout selection to ${fallback.name}.")
+        }
+
+        val config = version.getVersionConfig()
+        if (config.control == collapsed.name) {
+            val previous = config.control
+            runCatching {
+                config.control = ""
+                config.saveWithThrowable()
+                Logger.warning(TAG, "Cleared the collapsed per-version control layout override.")
+            }.onFailure { e ->
+                config.control = previous
+                Logger.warning(TAG, "Failed to clear the collapsed per-version control layout override.", e)
             }
         }
     }
@@ -681,7 +789,8 @@ fun GameScreen(
                 onReleasePointer = { viewModel.occupiedPointers.remove(it) },
                 isCursorGrabbing = isGrabbing,
                 hideLayerWhen = viewModel.controlLayerHideState,
-                isDark = isLauncherInDarkTheme()
+                isDark = isLauncherInDarkTheme(),
+                debugDiagnostics = BuildConfig.DEBUG
             ) {
                 //虚拟鼠标控制层
                 MouseControlLayout(
