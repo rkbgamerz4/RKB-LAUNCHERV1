@@ -93,7 +93,12 @@ jobs:
 
       - name: Verify debug APK
         shell: bash
+        env:
+          EXPECTED_PACKAGE: com.rkbgamerz.rkblauncher
+          EXPECTED_VERSION_CODE: ${{ github.run_number }}
+          EXPECTED_LAUNCHABLE: com.movtery.zalithlauncher.ui.activities.SplashActivity
         run: |
+          set -euo pipefail
           shopt -s nullglob
           apks=(ZalithLauncher/build/outputs/apk/debug/*.apk)
           if [ "${#apks[@]}" -eq 0 ]; then
@@ -103,6 +108,47 @@ jobs:
           printf 'Found %s debug APK(s):\n' "${#apks[@]}"
           ls -lh "${apks[@]}"
           sha256sum "${apks[@]}"
+
+          AAPT2="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort -V | tail -n 1)"
+          if [ -z "$AAPT2" ] || [ ! -x "$AAPT2" ]; then
+            echo "::error::aapt2 not found under $ANDROID_HOME/build-tools"
+            exit 1
+          fi
+
+          for apk in "${apks[@]}"; do
+            badging="$("$AAPT2" dump badging "$apk")"
+            package="$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")"
+            version_code="$(printf '%s\n' "$badging" | sed -n "s/^package: .* versionCode='\([0-9]*\)'.*/\1/p")"
+            launchable="$(printf '%s\n' "$badging" | sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p")"
+
+            printf 'APK identity: package=%s versionCode=%s launchable=%s\n' \
+              "$package" "$version_code" "$launchable"
+
+            if [ "$package" != "$EXPECTED_PACKAGE" ]; then
+              echo "::error::$apk has package '$package'; expected '$EXPECTED_PACKAGE' so it replaces the installed launcher"
+              exit 1
+            fi
+            if [ "$version_code" != "$EXPECTED_VERSION_CODE" ]; then
+              echo "::error::$apk has versionCode '$version_code'; expected '$EXPECTED_VERSION_CODE'"
+              exit 1
+            fi
+            if [ "$launchable" != "$EXPECTED_LAUNCHABLE" ]; then
+              echo "::error::$apk launches '$launchable'; expected '$EXPECTED_LAUNCHABLE'"
+              exit 1
+            fi
+
+            dex_file="$(mktemp)"
+            trap 'rm -f "$dex_file"' EXIT
+            unzip -p "$apk" 'classes*.dex' > "$dex_file"
+            for marker in RkbHomeScreen.kt RkbNavigationRail.kt RkbInstancesScreen.kt RkbSettingsHub.kt; do
+              if ! grep -aqF "$marker" "$dex_file"; then
+                echo "::error::$apk is missing reference UI marker '$marker'"
+                exit 1
+              fi
+            done
+            rm -f "$dex_file"
+            trap - EXIT
+          done
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
