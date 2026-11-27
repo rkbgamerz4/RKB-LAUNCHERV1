@@ -90,8 +90,9 @@ android {
         debug {
             signingConfig = signingConfigs.getByName("rkbDebugKey")
             isMinifyEnabled = false
-            // RKB: keep the production applicationId here. A .debug suffix installs a second app
-            // with the same launcher label, which lets the old launcher remain the one users open.
+            // RKB: the installed launcher on the test device is this debug applicationId.
+            // Keep it so CI APKs update that app instead of installing a second RKB icon.
+            applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }
     }

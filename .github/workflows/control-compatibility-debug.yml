@@ -94,7 +94,7 @@ jobs:
       - name: Verify debug APK
         shell: bash
         env:
-          EXPECTED_PACKAGE: com.rkbgamerz.rkblauncher
+          EXPECTED_PACKAGE: com.rkbgamerz.rkblauncher.debug
           EXPECTED_VERSION_CODE: ${{ github.run_number }}
           EXPECTED_LAUNCHABLE: com.movtery.zalithlauncher.ui.activities.SplashActivity
         run: |
