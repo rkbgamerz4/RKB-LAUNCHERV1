@@ -226,33 +226,42 @@ private fun AccountManageContent(
     operationUiState: AccountManageViewModel.OperationUiState,
     actions: AccountActions,
 ) {
-    Row(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        ActionsLayout(
-            isVisible = isVisible,
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(all = 12.dp)
-                .weight(3f),
-            currentAccount = profileUiState.currentAccount,
-            actions = actions
-        )
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+            RkbBar(text = "Back to home", onClick = actions.backToMainScreen)
+        }
 
-        AccountsLayout(
-            isVisible = isVisible,
+        Row(
             modifier = Modifier
-                .fillMaxHeight()
-                .padding(top = 12.dp, end = 12.dp, bottom = 12.dp)
-                .weight(7f),
-            accounts = profileUiState.accounts,
-            currentAccount = profileUiState.currentAccount,
-            accountOperation = operationUiState.accountOp,
-            accountSkinOperation = operationUiState.accountSkinOp,
-            accountSkinDialogState = operationUiState.accountSkinDialogState,
-            accountCapes = profileUiState.accountCapeOpMap,
-            actions = actions
-        )
+                .fillMaxSize()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 12.dp)
+                .weight(1f)
+        ) {
+            ActionsLayout(
+                isVisible = isVisible,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(3f),
+                currentAccount = profileUiState.currentAccount,
+                actions = actions
+            )
+
+            AccountsLayout(
+                isVisible = isVisible,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(start = 12.dp)
+                    .weight(7f),
+                accounts = profileUiState.accounts,
+                currentAccount = profileUiState.currentAccount,
+                accountOperation = operationUiState.accountOp,
+                accountSkinOperation = operationUiState.accountSkinOp,
+                accountSkinDialogState = operationUiState.accountSkinDialogState,
+                accountCapes = profileUiState.accountCapeOpMap,
+                actions = actions
+            )
+        }
     }
 
     LoginMenuOperation(loginUiState.menuOp, actions, profileUiState.authServers)
@@ -301,15 +310,34 @@ private fun ActionsLayout(
             refreshKey = listOf(currentAccount?.uniqueUUID, refreshWardrobe, skinFile?.lastModified() ?: 0L, capeFile?.lastModified() ?: 0L)
         )
 
-        //添加账号
+        // RKB reference-style sign-in actions; all login flows use the existing account backend.
         ScalingActionButton(
-            modifier = Modifier
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                actions.onIntent(
+                    AccountManageIntent.UpdateMicrosoftLoginOp(MicrosoftLoginOperation.Tip)
+                )
+            }
+        ) {
+            MarqueeText(text = "MICROSOFT")
+        }
+        Spacer(Modifier.height(6.dp))
+        ScalingActionButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                actions.onIntent(AccountManageIntent.UpdateLocalLoginOp(LocalLoginOperation.Edit))
+            }
+        ) {
+            MarqueeText(text = "OFFLINE")
+        }
+        Spacer(Modifier.height(6.dp))
+        ScalingActionButton(
+            modifier = Modifier.fillMaxWidth(),
             onClick = {
                 actions.onIntent(AccountManageIntent.UpdateLoginMenuOp(LoginMenuOperation.Login))
             }
         ) {
-            MarqueeText(text = stringResource(R.string.account_add_new_account))
+            MarqueeText(text = "ELY.BY / OTHER SERVER")
         }
     }
 }

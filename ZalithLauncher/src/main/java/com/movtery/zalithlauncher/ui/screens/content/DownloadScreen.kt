@@ -18,36 +18,25 @@
 
 package com.movtery.zalithlauncher.ui.screens.content
 
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import com.movtery.zalithlauncher.ui.screens.main.RkbTabChip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.entryProvider
@@ -69,8 +58,6 @@ import com.movtery.zalithlauncher.ui.screens.content.download.DownloadResourcePa
 import com.movtery.zalithlauncher.ui.screens.content.download.DownloadSavesScreen
 import com.movtery.zalithlauncher.ui.screens.content.download.DownloadShadersScreen
 import com.movtery.zalithlauncher.ui.screens.content.download.assets.search.SearchIdScreen
-import com.movtery.zalithlauncher.ui.screens.content.elements.CategoryIcon
-import com.movtery.zalithlauncher.ui.screens.content.elements.CategoryItem
 import com.movtery.zalithlauncher.ui.screens.navigateOnce
 import com.movtery.zalithlauncher.ui.screens.onBack
 import com.movtery.zalithlauncher.ui.screens.rememberTransitionSpec
@@ -163,69 +150,73 @@ fun DownloadScreen(
                 )
             } else {
                 Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    RkbBar(text = "Download categories") { RkbDownloadHub.page = RkbDownloadHub.Page.Hub }
+                    RkbBar(text = "Back to download categories") {
+                        RkbDownloadHub.page = RkbDownloadHub.Page.Hub
+                    }
                 }
                 if (page == RkbDownloadHub.Page.Rust) {
                     RkbHorizonScreen(modifier = Modifier.weight(1f).fillMaxWidth())
                 } else {
-                    if (page == RkbDownloadHub.Page.Normal) {
-                        TabMenu(
-                            modifier = Modifier.fillMaxWidth(),
-                            isVisible = isVisible,
-                            backStack = key.backStack,
+                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        if (page == RkbDownloadHub.Page.Normal) {
+                            RkbDownloadTabs(
+                                backStack = key.backStack,
+                                backScreenViewModel = backScreenViewModel,
+                                hideModpack = true
+                            )
+                        }
+                        RkbDownloadPages(
+                            key = key,
                             backScreenViewModel = backScreenViewModel,
-                            hideModpack = true
+                            eventViewModel = eventViewModel,
+                            modpackImportViewModel = modpackImportViewModel,
+                            submitError = submitError,
+                            modifier = Modifier.weight(1f).fillMaxWidth()
                         )
                     }
-
-                    NavigationUI(
-                        key = key,
-                        backScreenViewModel = backScreenViewModel,
-                        eventViewModel = eventViewModel,
-                        modpackImportViewModel = modpackImportViewModel,
-                        submitError = submitError,
-                        modifier = Modifier.weight(1f).fillMaxWidth()
-                    )
                 }
             }
         }
     }
 }
 
+private data class RkbDownloadTab(val key: TitledNavKey, val icon: Int, val label: Int)
+
 @Composable
-private fun TabMenu(
-    modifier: Modifier = Modifier,
-    isVisible: Boolean,
+private fun RkbDownloadTabs(
     backStack: NavBackStack<TitledNavKey>,
     backScreenViewModel: ScreenBackStackViewModel,
     hideModpack: Boolean = false,
 ) {
-    val downloadsList = listOf(
-        CategoryItem(backScreenViewModel.downloadGameScreen, { CategoryIcon(R.drawable.ic_sports_esports_outlined, R.string.download_category_game) }, R.string.download_category_game),
-        CategoryItem(backScreenViewModel.downloadModPackScreen, { CategoryIcon(R.drawable.ic_package_2_outlined, R.string.download_category_modpack) }, R.string.download_category_modpack),
-        CategoryItem(backScreenViewModel.downloadModScreen, { CategoryIcon(R.drawable.ic_extension_outlined, R.string.download_category_mod) }, R.string.download_category_mod, division = true),
-        CategoryItem(backScreenViewModel.downloadResourcePackScreen, { CategoryIcon(R.drawable.ic_format_paint_outlined, R.string.download_category_resource_pack) }, R.string.download_category_resource_pack),
-        CategoryItem(backScreenViewModel.downloadSavesScreen, { CategoryIcon(R.drawable.ic_public, R.string.download_category_saves) }, R.string.download_category_saves),
-        CategoryItem(backScreenViewModel.downloadShadersScreen, { CategoryIcon(R.drawable.ic_lightbulb, R.string.download_category_shaders) }, R.string.download_category_shaders),
-        CategoryItem(NormalNavKey.SearchId, { CategoryIcon(R.drawable.ic_card, R.string.download_category_by_id) }, R.string.download_category_by_id, division = true),
-        CategoryItem(backScreenViewModel.downloadFavoritesScreen, { CategoryIcon(R.drawable.ic_favorite_outlined, R.string.download_category_favorites) }, R.string.download_category_favorites),
+    val tabs = listOf(
+        RkbDownloadTab(backScreenViewModel.downloadGameScreen, R.drawable.ic_sports_esports_outlined, R.string.download_category_game),
+        RkbDownloadTab(backScreenViewModel.downloadModPackScreen, R.drawable.ic_package_2_outlined, R.string.download_category_modpack),
+        RkbDownloadTab(backScreenViewModel.downloadModScreen, R.drawable.ic_extension_outlined, R.string.download_category_mod),
+        RkbDownloadTab(backScreenViewModel.downloadResourcePackScreen, R.drawable.ic_format_paint_outlined, R.string.download_category_resource_pack),
+        RkbDownloadTab(backScreenViewModel.downloadSavesScreen, R.drawable.ic_public, R.string.download_category_saves),
+        RkbDownloadTab(backScreenViewModel.downloadShadersScreen, R.drawable.ic_lightbulb, R.string.download_category_shaders),
+        RkbDownloadTab(NormalNavKey.SearchId, R.drawable.ic_card, R.string.download_category_by_id),
+        RkbDownloadTab(backScreenViewModel.downloadFavoritesScreen, R.drawable.ic_favorite_outlined, R.string.download_category_favorites),
     ).filter { !(hideModpack && it.key === backScreenViewModel.downloadModPackScreen) }
 
     val scrollState = rememberScrollState()
     Row(
-        modifier = modifier
+        modifier = Modifier
             .horizontalScroll(scrollState)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        downloadsList.forEach { item ->
-            val selected = backScreenViewModel.downloadScreen.currentKey == item.key
-            RkbTabChip(selected = selected, onClick = { backStack.navigateOnce(item.key) }) {
-                item.icon()
+        tabs.forEach { tab ->
+            val selected = backScreenViewModel.downloadScreen.currentKey == tab.key
+            RkbTabChip(selected = selected, onClick = { backStack.navigateOnce(tab.key) }) {
+                androidx.compose.material3.Icon(
+                    painter = androidx.compose.ui.res.painterResource(tab.icon),
+                    contentDescription = null
+                )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = stringResource(item.textRes),
+                    text = stringResource(tab.label),
                     maxLines = 1,
                     style = MaterialTheme.typography.labelLarge
                 )
@@ -235,7 +226,7 @@ private fun TabMenu(
 }
 
 @Composable
-private fun NavigationUI(
+private fun RkbDownloadPages(
     key: NestedNavKey.Download,
     backScreenViewModel: ScreenBackStackViewModel,
     eventViewModel: EventViewModel,

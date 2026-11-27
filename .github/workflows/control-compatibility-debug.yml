@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/control-compatibility
+      - rkb-reference-ui
 
 permissions:
   contents: read
