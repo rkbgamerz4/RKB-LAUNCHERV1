@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat;
 import net.kdt.pojavlaunch.game.platform.Platform;
 import net.kdt.pojavlaunch.game.platform.cursor.PlatformCursor;
 import net.kdt.pojavlaunch.game.platform.cursor.PlatformCursorImplementor;
+import net.kdt.pojavlaunch.rkb.cursor.CursorStudioPrefs;
 
 import net.kdt.pojavlaunch.R;
 
@@ -21,7 +22,7 @@ import net.kdt.pojavlaunch.R;
  */
 public class GameCursorView extends View implements PlatformCursorImplementor {
     private final Paint customCursorPaint = new Paint();
-    private final Drawable cursorDrawable;
+    private Drawable cursorDrawable;
     private boolean noDraw = false;
     private float mouseScale = 1f;
 
@@ -42,6 +43,24 @@ public class GameCursorView extends View implements PlatformCursorImplementor {
         cursorDrawable = ContextCompat.getDrawable(context, R.drawable.ic_mouse_pointer);
         assert cursorDrawable != null;
         cursorDrawable.setBounds(0, 0, 36, 54);
+        updateCursorDrawable();
+    }
+
+    /** Rebuilds the fallback pointer from the same factory used by Cursor Studio's preview. */
+    private void updateCursorDrawable() {
+        String style = CursorStudioPrefs.getStyle();
+        Drawable d = CursorStudioPrefs.createDrawable(getContext(), style,
+                CursorStudioPrefs.getColorArgb(), CursorStudioPrefs.getOpacityPercent());
+        // The canvas already applies PREF_MOUSESCALE; this applies only the Cursor Studio size.
+        CursorStudioPrefs.applyBounds(d, style, CursorStudioPrefs.getSizeMultiplier());
+        cursorDrawable = d;
+        invalidate();
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        updateCursorDrawable();
     }
 
     @Override
@@ -67,7 +86,7 @@ public class GameCursorView extends View implements PlatformCursorImplementor {
 
     @Override
     public void onCursorChanged() {
-        post(this::invalidate);
+        post(this::updateCursorDrawable);
     }
 
     @Override

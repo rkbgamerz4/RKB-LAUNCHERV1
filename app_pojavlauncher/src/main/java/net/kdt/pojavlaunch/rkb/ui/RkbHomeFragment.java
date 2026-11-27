@@ -123,7 +123,7 @@ public class RkbHomeFragment extends Fragment {
         title.setPadding(0, RkbUi.dp(c, 6), 0, 0);
         card.addView(title);
         TextView desc = RkbUi.text(c,
-                "Pick an instance below and launch Minecraft: Java Edition.", 13, RkbUi.MUTED, false);
+                "Choose a version below and launch Minecraft: Java Edition.", 13, RkbUi.MUTED, false);
         desc.setPadding(0, RkbUi.dp(c, 6), 0, 0);
         card.addView(desc, matchWidth());
         card.addView(RkbUi.spacer(c, 14));

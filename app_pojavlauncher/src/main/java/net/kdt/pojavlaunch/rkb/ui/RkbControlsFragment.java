@@ -15,6 +15,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -32,6 +34,9 @@ import java.util.List;
 
 /** Controls screen backed by the real Pojav control-layout folder and editor activity. */
 public class RkbControlsFragment extends Fragment {
+    private final ActivityResultLauncher<String[]> mImportLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::startImport);
+
     private LinearLayout mList;
 
     @Nullable @Override
@@ -45,10 +50,8 @@ public class RkbControlsFragment extends Fragment {
 
         LinearLayout actions = new LinearLayout(c);
         actions.addView(RkbUi.button(c, "REFRESH", false, v -> reload()), actionLp(c, 1f));
-        actions.addView(RkbUi.button(c, "IMPORT", false, v -> {
-            Intent i = new Intent(v.getContext(), ImportControlActivity.class);
-            v.getContext().startActivity(i);
-        }), actionLp(c, 1f));
+        actions.addView(RkbUi.button(c, "IMPORT", false, v ->
+                mImportLauncher.launch(new String[]{"application/json", "*/*"})), actionLp(c, 1f));
         actions.addView(RkbUi.button(c, "CREATE", true, v -> {
             Intent i = new Intent(v.getContext(), CustomControlsActivity.class);
             v.getContext().startActivity(i);
@@ -78,6 +81,16 @@ public class RkbControlsFragment extends Fragment {
         reload();
         return RkbUi.scaffold(c, RkbNav.Dest.CONTROLS, "Controls",
                 "Manage real Pojav control layouts.", scroll);
+    }
+
+    /** Hands the SAF-selected layout to the existing Pojav import/validate activity. */
+    private void startImport(Uri uri) {
+        Activity a = getActivity();
+        if (uri == null || a == null || a.isFinishing() || a.isDestroyed()) return;
+        Intent intent = new Intent(a, ImportControlActivity.class);
+        intent.setData(uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        a.startActivity(intent);
     }
 
     private static LinearLayout.LayoutParams actionLp(android.content.Context c, float weight) {

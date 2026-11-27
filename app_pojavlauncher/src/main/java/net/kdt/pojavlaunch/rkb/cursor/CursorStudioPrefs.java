@@ -15,8 +15,8 @@ import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 /**
  * RKB Cursor Studio preferences + drawable factory.
  *
- * The SAME factory is used by the Cursor Studio preview and by the in-game virtual mouse
- * ({@code Touchpad}), so what the preview shows is what the touchpad cursor draws.
+ * The SAME factory is used by the Cursor Studio preview and by the in-game fallback pointer
+ * ({@link net.kdt.pojavlaunch.game.GameCursorView}), so the preview matches what the game draws.
  * Defaults (classic / 100% / 100%) reproduce the original PojavLauncher pointer exactly.
  */
 public final class CursorStudioPrefs {
