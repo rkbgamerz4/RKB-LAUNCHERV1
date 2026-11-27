@@ -18,64 +18,56 @@
 
 package com.movtery.zalithlauncher.ui.screens.main
 
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import com.movtery.zalithlauncher.ui.screens.content.RkbInstancesScreen
-import com.movtery.zalithlauncher.ui.screens.content.RkbSettingsHub
-import com.movtery.zalithlauncher.ui.screens.content.RkbHomeScreen
+import androidx.compose.foundation.layout.*;
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.offsetPx
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
-import com.movtery.zalithlauncher.BuildKeys
 import com.movtery.zalithlauncher.R
 import com.movtery.zalithlauncher.coroutine.Task
 import com.movtery.zalithlauncher.coroutine.TaskSystem
@@ -85,31 +77,28 @@ import com.movtery.zalithlauncher.path.PathManager
 import com.movtery.zalithlauncher.setting.AllSettings
 import com.movtery.zalithlauncher.ui.AndroidStringText
 import com.movtery.zalithlauncher.ui.androidText
-import com.movtery.zalithlauncher.ui.components.BackgroundCard
-import com.movtery.zalithlauncher.ui.components.CardTitleLayout
-import com.movtery.zalithlauncher.ui.components.TextRailItem
-import com.movtery.zalithlauncher.ui.guide.sendStartGuideOnce
-import com.movtery.zalithlauncher.ui.screens.BackStackNavKey
+import com.movtery.zalithlauncher.ui.base.BaseAppCompatActivity
+import com.movtery.zalithlauncher.ui.base.ObserveFullScreenSetting
+import com.movtery.zalithlauncher.ui.buildAppendedText
+import com.movtery.zalithlauncher.ui.components.SimpleAlertDialog
+import com.movtery.zalithlauncher.ui.guide.NextTipLabel
+import com.movtery.zalithlauncher.ui.guide.rememberAppGuides
 import com.movtery.zalithlauncher.ui.screens.NestedNavKey
 import com.movtery.zalithlauncher.ui.screens.NormalNavKey
-import com.movtery.zalithlauncher.ui.screens.TitledNavKey
 import com.movtery.zalithlauncher.ui.screens.content.AccountManageScreen
 import com.movtery.zalithlauncher.ui.screens.content.DownloadScreen
-import com.movtery.zalithlauncher.ui.screens.content.FileSelectorScreen
-import com.movtery.zalithlauncher.ui.screens.content.LauncherScreen
-import com.movtery.zalithlauncher.ui.screens.content.LicenseScreen
-import com.movtery.zalithlauncher.ui.screens.content.LogViewScreen
-import com.movtery.zalithlauncher.ui.screens.content.MultiplayerScreen
-import com.movtery.zalithlauncher.ui.screens.content.SettingsScreen
-import com.movtery.zalithlauncher.ui.screens.content.VersionExportScreen
-import com.movtery.zalithlauncher.ui.screens.content.VersionSettingsScreen
-import com.movtery.zalithlauncher.ui.screens.content.VersionsManageScreen
-import com.movtery.zalithlauncher.ui.screens.content.WebViewScreen
-import com.movtery.zalithlauncher.ui.screens.content.assetinfo.AssetInfoScreen
-import com.movtery.zalithlauncher.ui.screens.content.navigateToDownload
-import com.movtery.zalithlauncher.ui.screens.navigateTo
-import com.movtery.zalithlauncher.ui.screens.onBack
-import com.movtery.zalithlauncher.ui.screens.rememberTransitionSpec
+import com.movtery.zalithlauncher.ui.screens.content.RkbHomeScreen
+import com.movtery.zalithlauncher.ui.screens.content.RkbInstancesScreen
+import com.movtery.zalithlauncher.ui.screens.content.RkbSettingsHub
+import com.movtery.zalithlauncher.ui.screens.content.settings.AboutInfoScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.ControlManageScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.ControlSettingsScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.GameSettingsScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.GamepadSettingsScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.JavaManageScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.LauncherSettingsScreen
+import com.movtery.zalithlauncher.ui.screens.content.settings.RendererSettingsScreen
+import com.movtery.zalithlauncher.ui.theme.ZalithLauncherTheme
 import com.movtery.zalithlauncher.ui.theme.backgroundColor
 import com.movtery.zalithlauncher.ui.theme.cardColor
 import com.movtery.zalithlauncher.ui.theme.festivals.FestivalTitleText
@@ -126,6 +115,7 @@ import com.movtery.zalithlauncher.viewmodel.ModpackImportViewModel
 import com.movtery.zalithlauncher.viewmodel.ScreenBackStackViewModel
 import com.movtery.zalithlauncher.viewmodel.sendKeepScreen
 import com.movtery.zalithlauncher.viewmodel.sendToast
+import com.movtery.zalithlauncher.viewmodel.BackgroundViewModel
 
 @Composable
 fun MainScreen(
@@ -168,101 +158,53 @@ fun MainScreen(
         backgroundColor().copy(alpha = launcherBackgroundOpacity)
     } else backgroundColor()
 
+    // Track the selected pill index based on current screen key
+    val selectedPillIndex by remember {
+        derivedStateOf {
+            when (mainScreenKey) {
+                null, is NormalNavKey.LauncherMain -> 0 // Home
+                is NormalNavKey.AccountManager -> 1 // Account
+                is NormalNavKey.VersionsManager -> 2 // Instances
+                is NestedNavKey.Download -> 3 // Download
+                is NestedNavKey.Settings -> 4 // Settings
+                else -> 0
+            }
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = backgroundColor,
         contentColor = onBackgroundColor()
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-        RkbNavigationRail(
-            selected = rkbSelectedDestination(mainScreenKey),
-            onSelect = { dest ->
-                val clear = screenBackStackModel.clearBeforeNavKeys
-                when (dest) {
-                    RkbDestination.Home -> toMainScreen()
-                    RkbDestination.Account -> screenBackStackModel.mainScreen.removeAndNavigateTo(
-                        removes = clear, screenKey = NormalNavKey.AccountManager()
-                    )
-                    RkbDestination.Instances -> screenBackStackModel.mainScreen.removeAndNavigateTo(
-                        removes = clear, screenKey = NormalNavKey.VersionsManager
-                    )
-                    RkbDestination.Mods -> {
-                        // The mod manager is per-instance; without a selected instance, pick one first.
-                        val version = VersionsManager.currentVersion.value
-                        if (version == null) {
-                            screenBackStackModel.mainScreen.removeAndNavigateTo(
-                                removes = clear, screenKey = NormalNavKey.VersionsManager
-                            )
-                        } else {
-                            val key = NestedNavKey.VersionSettings(version)
-                            key.navigateTo(NormalNavKey.Versions.ModsManager)
-                            screenBackStackModel.mainScreen.navigateTo(key, useClassEquality = true)
-                        }
-                    }
-                    RkbDestination.Download -> screenBackStackModel.navigateToDownload()
-                    RkbDestination.Control, RkbDestination.About, RkbDestination.Setting -> {
-                        val target = when (dest) {
-                            RkbDestination.Control -> NormalNavKey.Settings.ControlManager
-                            RkbDestination.About -> NormalNavKey.Settings.AboutInfo
-                            else -> NormalNavKey.Settings.Renderer
-                        }
-                        RkbSettingsHub.show = (dest == RkbDestination.Setting)
-                        screenBackStackModel.settingsScreen.navigateTo(target)
-                        screenBackStackModel.mainScreen.removeAndNavigateTo(
-                            removes = clear, screenKey = screenBackStackModel.settingsScreen
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Top) {
+            // Top pill navigation bar
+            PillNavigationBar(
+                selectedIndex = selectedPillIndex,
+                onSelect = { newIndex ->
+                    when (newIndex) {
+                        0 -> screenBackStackModel.mainScreen.clearWith(NormalNavKey.LauncherMain)
+                        1 -> screenBackStackModel.mainScreen.removeAndNavigateTo(
+                            removes = screenBackStackModel.clearBeforeNavKeys,
+                            screenKey = NormalNavKey.AccountManager(FirstLoginMenu.NONE)
+                        )
+                        2 -> screenBackStackModel.mainScreen.removeAndNavigateTo(
+                            removes = screenBackStackModel.clearBeforeNavKeys,
+                            screenKey = NormalNavKey.VersionsManager
+                        )
+                        3 -> screenBackStackModel.navigateToDownload()
+                        4 -> screenBackStackModel.mainScreen.removeAndNavigateTo(
+                            removes = screenBackStackModel.clearBeforeNavKeys,
+                            screenKey = screenBackStackModel.settingsScreen
                         )
                     }
                 }
-            }
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-        ) {
-            TopBar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp),
-                mainScreenKey = mainScreenKey,
-                inLauncherScreen = inLauncherScreen,
-                taskRunning = tasks.isEmpty(),
-                isTasksExpanded = isTaskMenuExpanded,
-                contentColor = onBackgroundColor(),
-                onScreenBack = {
-                    screenBackStackModel.mainScreen.backStack.removeFirstOrNull()
-                },
-                toMainScreen = toMainScreen,
-                toSettingsScreen = {
-                    screenBackStackModel.mainScreen.removeAndNavigateTo(
-                        removes = screenBackStackModel.clearBeforeNavKeys,
-                        screenKey = screenBackStackModel.settingsScreen
-                    )
-                },
-                toDownloadScreen = {
-                    screenBackStackModel.navigateToDownload()
-                },
-                toMultiplayerScreen = {
-                    screenBackStackModel.mainScreen.removeAndNavigateTo(
-                        removes = screenBackStackModel.clearBeforeNavKeys,
-                        screenKey = NormalNavKey.Multiplayer
-                    )
-                },
-                openFileManager = {
-                    eventViewModel.sendEvent(
-                        EventViewModel.Event.OpenFileManager(
-                            rootPath = PathManager.DIR_FILES_EXTERNAL.absolutePath
-                        )
-                    )
-                },
-                changeExpandedState = {
-                    changeTasksExpandedState()
-                },
             )
 
+            // Content area with glass background
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .weight(1f)
             ) {
                 NavigationUI(
@@ -287,7 +229,6 @@ fun MainScreen(
                     changeTasksExpandedState()
                 }
             }
-        }
         }
     }
 }
@@ -603,7 +544,7 @@ private fun NavigationUI(
                 entry<NormalNavKey.FileSelector> { key ->
                     FileSelectorScreen(
                         key = key,
-                        backScreenViewModel = screenBackStackModel
+                        backScreenViewModel = screenBackViewModel
                     ) {
                         backStack.removeLastOrNull()
                     }
@@ -632,19 +573,10 @@ private fun NavigationUI(
                 entry<NestedNavKey.Download> { key ->
                     DownloadScreen(
                         key = key,
-                        backScreenViewModel = screenBackStackModel,
+                        backScreenViewModel = backScreenViewModel,
                         eventViewModel = eventViewModel,
                         modpackImportViewModel = modpackImportViewModel,
                         submitError = submitError
-                    )
-                }
-                entry<NestedNavKey.AssetInfo> { key ->
-                    AssetInfoScreen(
-                        key = key,
-                        mainScreenKey = screenBackStackModel.mainScreen.currentKey,
-                        assetInfoScreenKey = key.currentKey,
-                        eventViewModel = eventViewModel,
-                        submitError = submitError,
                     )
                 }
                 entry<NormalNavKey.Multiplayer> {
@@ -835,5 +767,79 @@ private fun TaskItem(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RkbBrandTitle() {
+    val scheme = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.Image(
+            painter = painterResource(R.drawable.rkb_logo),
+            contentDescription = "RKB",
+            modifier = Modifier.height(26.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = androidx.compose.ui.text.buildAnnotatedString {
+                withStyle(androidx.compose.ui.text.SpanStyle(color = scheme.primary)) { append("RKB ") }
+                append("LAUNCHER")
+            },
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = "PLAY \u2022 EXPLORE \u2022 CREATE",
+            style = MaterialTheme.typography.labelSmall,
+            color = scheme.secondary,
+            letterSpacing = 2.sp,
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(Modifier.width(12.dp))
+    }
+}
+
+@Composable
+private fun RkbAccountChip() {
+    val scheme = MaterialTheme.colorScheme
+    val account = com.movtery.zalithlauncher.game.account.AccountsManager.currentAccountFlow
+        .collectAsState().value
+    val name = account?.username ?: "No account"
+    val kind = if (account == null) "ADD ACCOUNT"
+    else if (account.isLocalAccount()) "LOCAL" else "ONLINE"
+    val pickWallpaper = com.movtery.zalithlauncher.ui.screens.content.settings.rememberWallpaperPicker()
+
+    Box(
+        modifier = Modifier
+            .background(scheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
+            .padding(start = 6.dp, end = 12.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (account != null) {
+            com.movtery.zalithlauncher.ui.screens.content.elements.PlayerFace(
+                modifier = Modifier.clip(androidx.compose.foundation.shape.CircleShape),
+                account = account,
+                avatarSize = 30.dp
+            )
+        } else {
+            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = scheme.primaryContainer, modifier = Modifier.size(30.dp)) {}
+        }
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(name, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(kind, style = MaterialTheme.typography.labelSmall, color = scheme.primary, maxLines = 1)
+        }
+    }
+    Spacer(Modifier.width(6.dp))
+    androidx.compose.material3.IconButton(onClick = pickWallpaper) {
+        Icon(
+            painter = painterResource(R.drawable.ic_format_paint_outlined),
+            contentDescription = "Wallpaper",
+            tint = scheme.primary
+        )
     }
 }

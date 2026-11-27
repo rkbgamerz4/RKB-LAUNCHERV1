@@ -18,18 +18,15 @@
 
 package com.movtery.zalithlauncher.ui.screens.content
 
-import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import com.movtery.zalithlauncher.ui.screens.main.RkbTabChip
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -87,7 +84,7 @@ fun ScreenBackStackViewModel.navigateToDownload(targetScreen: TitledNavKey? = nu
     // RKB: the category hub is the landing page; deep links go straight to their own category
     RkbDownloadHub.page = when {
         targetScreen == null -> RkbDownloadHub.Page.Hub
-        targetScreen === downloadModPackScreen -> RkbDownloadHub.Page.ModPack
+        targetScreen == downloadModPackScreen -> RkbDownloadHub.Page.ModPack
         else -> RkbDownloadHub.Page.Normal
     }
     downloadScreen.clearWith(targetScreen ?: downloadGameScreen)
@@ -212,24 +209,117 @@ private fun TabMenu(
     ).filter { !(hideModpack && it.key === backScreenViewModel.downloadModPackScreen) }
 
     val scrollState = rememberScrollState()
-    Row(
-        modifier = modifier
-            .horizontalScroll(scrollState)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    // Redesigned: Pill navigation bar at top instead of side rail
+    PillDownloadTabs(
+        selectedKey = backScreenViewModel.downloadScreen.currentKey,
+        onSelect = { backStack.navigateOnce(it) },
+        downloadsList = downloadsList,
+        scrollState = scrollState
+    )
+
+    HorizontalDivider(
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .fillMaxWidth(0.4f)
+            .alpha(0.2f),
+        color = MaterialTheme.colorScheme.onSurface
+    )
+}
+
+@Composable
+private fun PillDownloadTabs(
+    selectedKey: TitledNavKey?,
+    onSelect: (TitledNavKey) -> Unit,
+    downloadsList: List<CategoryItem>,
+    scrollState: androidx.compose.foundation.rememberScrollState.ScrollState
+) {
+    val scheme = MaterialTheme.colorScheme
+
+    // Pill bar with category tabs
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(
+                Brush.solid(scheme.surfaceContainerHigh),
+                RoundedCornerShape(20.dp)
+            ),
+        onClick = {}
     ) {
-        downloadsList.forEach { item ->
-            val selected = backScreenViewModel.downloadScreen.currentKey == item.key
-            RkbTabChip(selected = selected, onClick = { backStack.navigateOnce(item.key) }) {
-                item.icon()
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(item.textRes),
-                    maxLines = 1,
-                    style = MaterialTheme.typography.labelLarge
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items(downloadsList).forEach { item ->
+                val selected = selectedKey == item.key
+                PillDownloadTab(
+                    selected = selected,
+                    onClick = { onSelect(item.key) },
+                    icon = item.icon(),
+                    text = stringResource(item.textRes)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun PillDownloadTab(
+    selected: Boolean,
+    onClick: () -> Unit,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+    icon: androidx.compose.ui.graphics.Bitmap?, // placeholder
+    text: String
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier
+            .height(28.dp)
+            .background(
+                if (selected)
+                    Brush.solid(scheme.primaryContainer)
+                else
+                    Brush.solid(scheme.surfaceContainerHigh),
+                RoundedCornerShape(16.dp)
+            ),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            // Icon placeholder - use material icon based on category
+            Icon(
+                painter = painterResource(when (textRes) {
+                    R.string.download_category_game -> R.drawable.ic_sports_esports_outlined
+                    R.string.download_category_modpack -> R.drawable.ic_package_2_outlined
+                    R.string.download_category_mod -> R.drawable.ic_extension_outlined
+                    R.string.download_category_resource_pack -> R.drawable.ic_format_paint_outlined
+                    R.string.download_category_saves -> R.drawable.ic_public
+                    R.string.download_category_shaders -> R.drawable.ic_lightbulb
+                    R.string.download_category_by_id -> R.drawable.ic_card
+                    R.string.download_category_favorites -> R.drawable.ic_favorite_outlined
+                    else -> R.drawable.ic_download
+                }),
+                contentDescription = text,
+                tint = if (selected) Color.White else scheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = text,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    color = if (selected) Color.White else scheme.onSurfaceVariant,
+                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
+                ),
+                softWrap = false
+            )
         }
     }
 }

@@ -1,6 +1,7 @@
 /*
  * RKB LAUNCHER - reference-style Home (wallpaper banner, version picker, PLAY, RAM/renderer card).
  * Based on Zalith Launcher 2 (GPLv3).
+ * Redesigned to match reference images: top pill navigation, glass background, wallpaper system.
  */
 package com.movtery.zalithlauncher.ui.screens.content
 
@@ -85,18 +86,62 @@ fun RkbHomeScreen(
         modifier = modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF0B1E45), Color(0xFF3B2A5E), Color(0xFF05070C))))
+            // Glass background with blue-tinted wallpaper effect
+            .background(
+                // Layer 1: Deep blue-tinted glass gradient
+                Brush.linearGradient(
+                    listOf(
+                        Color(0xFF0B1E45),
+                        Color(0xFF1A2D55),
+                        Color(0xFF0A0C1A)
+                    ),
+                    start = androidx.compose.ui.graphics.IntOffset(0, 0),
+                    end = androidx.compose.ui.graphics.IntOffset(0, Int.MaxValue)
+                ),
+                // Layer 2: Wallpaper if available, blended with glass
+                if (wallpaperFile != null) {
+                    AsyncImage(
+                        model = androidx.compose.ui.platform rememberImageLocalUri(
+                            androidx.compose.ui.platform.LocalContext.current,
+                            androidx.compose.ui.platform.AndroidContentProviderLocalUri(
+                                androidx.compose.ui.platform.LocalContext.current
+                            )
+                        ),
+                        uri = androidx.compose.ui.platform.AndroidContentProviderLocalUri(
+                            androidx.compose.ui.platform.LocalContext.current
+                        ),
+                        placeholder = painterResource(R.drawable.img_launcher),
+                        contentDescription = "Home wallpaper",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        // Fallback: simple Minecraft-like pattern
+                        val wallpaperSize = size
+                        val centerX = wallpaperSize.width / 2f
+                        val centerY = wallpaperSize.height / 2f
+                        // Draw simple grass block pattern
+                        val blockSize = 40f
+                        val paint = androidx.compose.ui paint.Paint()
+                        paint.color = Color(0xFF155A2A).copy(alpha = 0.02f)
+                        for (x in (0f..wallpaperSize.width).step blockSize) {
+                            for (y in (0f..wallpaperSize.height).step blockSize) {
+                                drawRect(
+                                    androidx.compose.ui.draw.Rectangle(
+                                        x = x,
+                                        y = y,
+                                        width = blockSize,
+                                        height = blockSize
+                                    ),
+                                    paint = paint
+                                )
+                            }
+                        }
+                    }
+                }
+            )
     ) {
-        if (wallpaperFile != null) {
-            RkbWallpaperView(file = wallpaperFile, modifier = Modifier.fillMaxSize())
-        }
-        // readability scrim on the left, where the text sits
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(Color(0xCC05070C), Color.Transparent)))
-        )
-
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -121,9 +166,9 @@ fun RkbHomeScreen(
             Spacer(Modifier.height(14.dp))
 
             Surface(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenVersions),
+                modifier = Modifier.fillMaxWidth().clickable(onOpenVersions),
                 shape = RoundedCornerShape(14.dp),
-                color = scheme.surfaceContainerHigh.copy(alpha = 0.9f),
+                color = scheme.surfaceContainerHigh.copy(alpha = 0.95f),
                 border = BorderStroke(1.dp, scheme.outline)
             ) {
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -150,10 +195,15 @@ fun RkbHomeScreen(
                     contentColor = scheme.onPrimaryContainer
                 )
             ) {
-                Text("\u25B6  PLAY", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(
+                    "\u25B6  PLAY",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
             }
         }
 
+        // Bottom-right: RAM / Renderer card
         Surface(
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
             shape = RoundedCornerShape(14.dp),

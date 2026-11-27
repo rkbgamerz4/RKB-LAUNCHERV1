@@ -18,15 +18,15 @@
 
 package com.movtery.zalithlauncher.ui.screens.content
 
-import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -54,8 +54,6 @@ import com.movtery.zalithlauncher.ui.components.fadeEdge
 import com.movtery.zalithlauncher.ui.screens.NestedNavKey
 import com.movtery.zalithlauncher.ui.screens.NormalNavKey
 import com.movtery.zalithlauncher.ui.screens.TitledNavKey
-import com.movtery.zalithlauncher.ui.screens.content.elements.CategoryIcon
-import com.movtery.zalithlauncher.ui.screens.content.elements.CategoryItem
 import com.movtery.zalithlauncher.ui.screens.content.settings.AboutInfoScreen
 import com.movtery.zalithlauncher.ui.screens.content.settings.ControlManageScreen
 import com.movtery.zalithlauncher.ui.screens.content.settings.ControlSettingsScreen
@@ -64,10 +62,6 @@ import com.movtery.zalithlauncher.ui.screens.content.settings.GamepadSettingsScr
 import com.movtery.zalithlauncher.ui.screens.content.settings.JavaManageScreen
 import com.movtery.zalithlauncher.ui.screens.content.settings.LauncherSettingsScreen
 import com.movtery.zalithlauncher.ui.screens.content.settings.RendererSettingsScreen
-import com.movtery.zalithlauncher.ui.screens.navigateOnce
-import com.movtery.zalithlauncher.ui.screens.onBack
-import com.movtery.zalithlauncher.ui.screens.rememberTransitionSpec
-import com.movtery.zalithlauncher.utils.animation.swapAnimateDpAsState
 import com.movtery.zalithlauncher.viewmodel.ErrorViewModel
 import com.movtery.zalithlauncher.viewmodel.EventViewModel
 import com.movtery.zalithlauncher.viewmodel.ScreenBackStackViewModel
@@ -166,23 +160,38 @@ private fun TabMenu(
                 )
             }
 
-            NavigationRailItem(
-                selected = settingsScreenKey == item.key,
+            Surface(
+                modifier = Modifier
+                    .height(36.dp)
+                    .background(
+                        if (settingsScreenKey == item.key)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                        RoundedCornerShape(16.dp)
+                    ),
                 onClick = {
                     navigateTo(item.key)
-                },
-                icon = {
-                    item.icon()
-                },
-                label = {
+                }
+            ) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painterResource(item.icon),
+                        contentDescription = null,
+                        tint = if (settingsScreenKey == item.key) Color.White else scheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
                     Text(
                         modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
                         text = stringResource(item.textRes),
                         maxLines = 1,
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = if (settingsScreenKey == item.key) Color.White else scheme.onSurfaceVariant
+                        )
                     )
                 }
-            )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -250,7 +259,6 @@ private fun NavigationUI(
                         checkUpdate = {
                             eventViewModel.sendEvent(EventViewModel.Event.CheckUpdate)
                         },
-                        openLicense = openLicenseScreen,
                         openLink = { url ->
                             eventViewModel.sendEvent(EventViewModel.Event.OpenLink(url))
                         }

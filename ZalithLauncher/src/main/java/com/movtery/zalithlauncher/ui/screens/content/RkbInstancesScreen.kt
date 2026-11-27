@@ -1,6 +1,7 @@
 /*
  * RKB LAUNCHER - reference-style Instances screen (search / sort / loader filter / New / empty state).
  * Reuses Zalith's real instance list item and rename/copy/delete/export actions. GPLv3.
+ * Redesigned to match reference images: glass cards, top pill navigation, Rust/RKB BOOST entries.
  */
 package com.movtery.zalithlauncher.ui.screens.content
 
@@ -119,15 +120,27 @@ fun RkbInstancesScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_folder_outlined), null, tint = scheme.primary, modifier = Modifier.size(34.dp))
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("Instances", style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Manage your Minecraft instances. Create, edit or launch your worlds.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.primary
-                    )
+                Surface(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            RoundedCornerShape(16.dp)
+                        ),
+                    onClick = {} // placeholder for pill click
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                        Icon(painterResource(R.drawable.ic_folder_outlined), null, tint = scheme.primary, modifier = Modifier.size(28.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Instances", style = MaterialTheme.typography.headlineSmall)
+                            Text(
+                                "Manage your Minecraft instances. Create, edit or launch your worlds.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = scheme.primary
+                            )
+                        }
+                    }
                 }
             }
 
@@ -138,8 +151,8 @@ fun RkbInstancesScreen(
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
-                    placeholder = { Text("Search instances...") }
-                )
+                    placeholder = { Text("Search instances...", color = scheme.onSurfaceVariant) }
+                }
                 RkbDropdown(
                     label = listOf("Default order", "Name A-Z", "Name Z-A")[sort],
                     options = listOf("Default order", "Name A-Z", "Name Z-A").mapIndexed { i, t -> t to { sort = i } }
@@ -152,13 +165,91 @@ fun RkbInstancesScreen(
                     label = loaders.firstOrNull { it.second == loaderChoice }?.first ?: "All Loaders",
                     options = loaders.map { (name, id) -> name to { loaderChoice = id } }
                 )
-                Button(
-                    onClick = { backScreenViewModel.navigateToDownload() },
-                    shape = RoundedCornerShape(14.dp)
+                Surface(
+                    modifier = Modifier
+                        .height(44.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            RoundedCornerShape(20.dp)
+                        ),
+                    onClick = {} // placeholder
                 ) {
-                    Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("New")
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                        Button(
+                            onClick = { backScreenViewModel.navigateToDownload() },
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("New")
+                        }
+                        // Rust Edition COMING SOON pill
+                        Surface(
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .height(44.dp)
+                                .width(120.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    RoundedCornerShape(20.dp)
+                                ),
+                            onClick = {} // TODO: Open Rust Edition screen
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                                Icon(
+                                    painterResource(R.drawable.ic_regular_expression), // rust icon
+                                    contentDescription = "Rust Edition",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        "Rust Edition",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "COMING SOON",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                        // RKB BOOST COMING SOON pill
+                        Surface(
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .height(44.dp)
+                                .width(120.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    RoundedCornerShape(20.dp)
+                                ),
+                            onClick = {} // TODO: Open RKB BOOST screen
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                                Icon(
+                                    painterResource(R.drawable.ic_compose), // RKB BOOST icon
+                                    contentDescription = "RKB BOOST",
+                                    tint = Color(0xFFFFD700) // gold accent
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        "RKB BOOST",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "COMING SOON",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -204,37 +295,79 @@ fun RkbInstancesScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         if (allVersions.isEmpty()) {
-                            Text("NO INSTANCES YET", style = MaterialTheme.typography.titleMedium)
-                            Text("Create your first Minecraft instance.", color = scheme.onSurfaceVariant)
-                            Spacer(Modifier.height(12.dp))
-                            OutlinedButton(onClick = { backScreenViewModel.navigateToDownload() }) {
-                                Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Add Instance")
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = scheme.surfaceContainerHigh,
+                                border = BorderStroke(1.dp, scheme.outlineVariant)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .padding(32.dp),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_error_outlined),
+                                        contentDescription = "No instances",
+                                        tint = scheme.onSurfaceVariant,
+                                        modifier = Modifier.size(64.dp)
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        "NO INSTANCES YET",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = scheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "Create your first Minecraft instance.",
+                                        color = scheme.onSurfaceVariant
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { backScreenViewModel.navigateToDownload() },
+                                        shape = RoundedCornerShape(14.dp)
+                                    ) {
+                                        Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Add Instance")
+                                    }
+                                }
                             }
                         } else {
-                            Text("NO MATCHING INSTANCES", style = MaterialTheme.typography.titleMedium)
-                            Text("Change the search text or the loader filter.", color = scheme.onSurfaceVariant)
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = scheme.surfaceContainerHigh,
+                                border = BorderStroke(1.dp, scheme.outlineVariant)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .padding(32.dp),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_error_outlined),
+                                        contentDescription = "No matching instances",
+                                        tint = scheme.onSurfaceVariant,
+                                        modifier = Modifier.size(64.dp)
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        "NO MATCHING INSTANCES",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = scheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "Change the search text or the loader filter.",
+                                        color = scheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RkbDropdown(label: String, options: List<Pair<String, () -> Unit>>) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(onClick = { open = true }, shape = RoundedCornerShape(14.dp)) {
-            Text(label, maxLines = 1)
-            Spacer(Modifier.width(4.dp))
-            Icon(painterResource(R.drawable.ic_keyboard_arrow_down), null, modifier = Modifier.size(18.dp))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            options.forEach { (text, action) ->
-                DropdownMenuItem(text = { Text(text) }, onClick = { open = false; action() })
             }
         }
     }
@@ -254,10 +387,32 @@ private fun RkbHorizonInstanceCard(version: String) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Horizon 26.3", style = MaterialTheme.typography.titleMedium)
-                Text("Minecraft Rust Edition, external native app (app version $version)", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                Text(
+                    "Minecraft Rust Edition, external native app (app version $version)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant
+                )
                 Text("Loader: Native", style = MaterialTheme.typography.labelMedium, color = Color(0xFFFF6A1A))
             }
             Button(onClick = { com.movtery.zalithlauncher.utils.RkbHorizon.launch(context) }) { Text("PLAY") }
+        }
+    }
+}
+
+/* Dropdown component - same as original */
+@Composable
+private fun RkbDropdown(label: String, options: List<Pair<String, () -> Unit>>) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { open = true }, shape = RoundedCornerShape(14.dp)) {
+            Text(label, maxLines = 1)
+            Spacer(Modifier.width(4.dp))
+            Icon(painterResource(R.drawable.ic_keyboard_arrow_down), null, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { (text, action) ->
+                DropdownMenuItem(text = { Text(text) }, onClick = { open = false; action() })
+            }
         }
     }
 }
