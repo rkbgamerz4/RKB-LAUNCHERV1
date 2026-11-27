@@ -48,7 +48,8 @@ public class LocalLoginFragment extends Fragment {
             ExtraCore.setValue(ExtraConstants.MOJANG_LOGIN_TODO, new String[]{
                     mUsernameEditText.getText().toString(), "" });
 
-            Tools.swapFragment(requireActivity(), MainMenuFragment.class, MainMenuFragment.TAG, null);
+            // The RKB launcher host consumes MOJANG_LOGIN_TODO and opens the Account screen.
+            Tools.backToMainMenu(requireActivity());
         });
     }
 

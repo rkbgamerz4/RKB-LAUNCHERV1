@@ -1,5 +1,6 @@
 package net.kdt.pojavlaunch.rkb.ui;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,27 +14,29 @@ import androidx.fragment.app.Fragment;
 import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.prefs.screens.LauncherPreferenceFragment;
 
-/**
- * Hosts the EXISTING settings screens (LauncherPreferenceFragment and its Video / Controls / Java /
- * Misc / Experimental sub-screens) inside the RKB shell. No preference is added, removed or renamed.
- */
+/** Hosts the existing launcher preferences inside the RKB shell without changing any option. */
 public class RkbSettingsFragment extends Fragment {
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         FrameLayout host = new FrameLayout(requireContext());
         host.setId(R.id.rkb_settings_container);
-        host.setBackground(RkbUi.rounded(requireContext(), RkbUi.PANEL, 14, RkbUi.BORDER, 1));
-        host.setClipToOutline(false);
         if (getChildFragmentManager().findFragmentById(R.id.rkb_settings_container) == null) {
             getChildFragmentManager().beginTransaction()
                     .setReorderingAllowed(true)
-                    .replace(R.id.rkb_settings_container, new LauncherPreferenceFragment())
+                    .replace(R.id.rkb_settings_container, new TransparentPreferenceFragment())
                     .commit();
         }
         return RkbUi.scaffold(requireContext(), RkbNav.Dest.SETTINGS, "Settings",
                 "Customize your launcher preferences.", host);
+    }
+
+    /** Keeps every real preference from pref_main.xml, but lets the RKB background show through. */
+    public static class TransparentPreferenceFragment extends LauncherPreferenceFragment {
+        @Override public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+            super.onViewCreated(view, savedInstanceState);
+            view.setBackgroundColor(Color.TRANSPARENT);
+        }
     }
 }

@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import net.kdt.pojavlaunch.R;
-import net.kdt.pojavlaunch.value.MinecraftAccount;
+import net.kdt.pojavlaunch.authenticator.accounts.Account;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,16 +60,15 @@ public final class RkbSkinLoader {
     private RkbSkinLoader() {}
 
     /** Callback is delivered on the main thread. Callers must check that their view is still alive. */
-    public static void load(@NonNull Context context, @Nullable MinecraftAccount account, @NonNull Callback cb) {
+    public static void load(@NonNull Context context, @Nullable Account account, @NonNull Callback cb) {
         final Context app = context.getApplicationContext();
         // copy the few fields we need so the account object is not touched from the worker thread
         final boolean ms = account != null && account.isMicrosoft;
         final String uuid = account == null ? null : account.profileId;
-        final String customUrl = account == null ? null : account.skinUrl;
         EXECUTOR.execute(() -> {
             Result r;
             try {
-                r = resolve(app, ms, uuid, customUrl);
+                r = resolve(app, ms, uuid);
             } catch (Throwable t) {
                 Log.w(TAG, "skin resolve failed: " + t);
                 r = defaultResult(app, "Could not load the skin, showing the default one");
@@ -79,7 +78,7 @@ public final class RkbSkinLoader {
         });
     }
 
-    private static Result resolve(Context ctx, boolean microsoft, String uuid, String customUrl) {
+    private static Result resolve(Context ctx, boolean microsoft, String uuid) {
         if (microsoft) {
             String id = normalizeUuid(uuid);
             if (id != null) {
@@ -100,14 +99,6 @@ public final class RkbSkinLoader {
                 }
                 return defaultResult(ctx, "Skin unavailable (offline or no skin set) - showing the default");
             }
-        } else if (customUrl != null && !customUrl.isEmpty()) {
-            try {
-                Bitmap b = downloadSkin(customUrl, false);
-                if (b != null) return new Result(b, false, false, "Preview of your saved skin URL");
-            } catch (Exception e) {
-                Log.w(TAG, "custom skin preview failed: " + e);
-            }
-            return defaultResult(ctx, "Could not load the saved skin URL");
         }
         return defaultResult(ctx, null);
     }

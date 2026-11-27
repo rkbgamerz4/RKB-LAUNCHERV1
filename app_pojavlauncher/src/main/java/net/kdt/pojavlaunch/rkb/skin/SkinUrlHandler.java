@@ -2,30 +2,14 @@ package net.kdt.pojavlaunch.rkb.skin;
 
 import android.util.Log;
 
-import net.kdt.pojavlaunch.value.MinecraftAccount;
+import net.kdt.pojavlaunch.authenticator.accounts.Account;
 
 /**
- * RKB Launcher — Skin URL automatic application.
+ * Safe skin-command helper.
  *
- * Flow required by product:
- *   User saves Skin URL on account
- *   → Launch Minecraft
- *   → Join multiplayer server
- *   → Detect successful multiplayer connection
- *   → Automatically send: /skin url <saved URL>
- *
- * Rules:
- * - Do NOT send before successful server join.
- * - Do NOT create a server plugin.
- * - Use the selected account's skinUrl only.
- * - If skinUrl is null/empty → do nothing.
- * - Account switching uses the newly selected account's URL.
- * - Launcher UI does not expose a manual "send skin command" button.
- *
- * Integration note:
- * The actual injection point must be wired into the real Minecraft client
- * connection lifecycle (after multiplayer join succeeds). This class only
- * provides the safe command builder and guards; it does not invent APIs.
+ * This project branch's {@link Account} model does not persist a skin URL, so there is no real
+ * command to send after joining a multiplayer server. The hook is intentionally a no-op rather
+ * than inventing a setting or injecting an unimplemented chat command.
  */
 public final class SkinUrlHandler {
     private static final String TAG = "RKB-SkinUrl";
@@ -34,39 +18,25 @@ public final class SkinUrlHandler {
     private SkinUrlHandler() {}
 
     /**
-     * @return the full chat command, or null if the account has no usable skinUrl.
+     * @return always null in this branch: the account model has no saved skin URL.
      */
-    public static String buildCommand(MinecraftAccount account) {
-        if (account == null) return null;
-        String url = account.skinUrl;
-        if (url == null) return null;
-        url = url.trim();
-        if (url.isEmpty()) return null;
-        // Basic sanity: must look like a URL
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            Log.w(TAG, "skinUrl does not look like an http(s) URL, skipping");
-            return null;
-        }
-        return COMMAND_PREFIX + url;
+    public static String buildCommand(Account account) {
+        Log.d(TAG, "Account model has no skinUrl; nothing to send");
+        return null;
     }
 
     /**
-     * Called by the launch / multiplayer join hook when a successful
-     * multiplayer connection has been established.
-     *
-     * @param account currently selected account
-     * @param sendChatCommand callback that actually injects the chat message
-     *                        into the running Minecraft client (must be real)
+     * Called by a real multiplayer-join hook. Left as a guarded no-op until an account model with
+     * a persisted skin URL exists in this branch.
      */
-    public static void onMultiplayerJoined(MinecraftAccount account,
-                                           ChatCommandSender sendChatCommand) {
+    public static void onMultiplayerJoined(Account account, ChatCommandSender sendChatCommand) {
         String cmd = buildCommand(account);
         if (cmd == null) {
-            Log.d(TAG, "No skinUrl for account, nothing to send");
+            Log.d(TAG, "No skin URL for account, nothing to send");
             return;
         }
         if (sendChatCommand == null) {
-            Log.e(TAG, "No ChatCommandSender provided — cannot send skin command");
+            Log.e(TAG, "No ChatCommandSender provided; cannot send skin command");
             return;
         }
         try {
@@ -77,7 +47,7 @@ public final class SkinUrlHandler {
         }
     }
 
-    /** Minimal callback interface — implement with real client chat injection. */
+    /** Minimal callback interface for a real client chat-injection implementation. */
     public interface ChatCommandSender {
         void send(String command);
     }

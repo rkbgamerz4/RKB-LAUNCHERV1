@@ -1,17 +1,12 @@
 package net.kdt.pojavlaunch.rkb.ui;
 
 import android.app.AlertDialog;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.InputType;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -22,257 +17,221 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import net.kdt.pojavlaunch.PojavProfile;
 import net.kdt.pojavlaunch.Tools;
-import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
-import net.kdt.pojavlaunch.rkb.skin.RkbSkinLoader;
-import net.kdt.pojavlaunch.rkb.skin.RkbSkinView;
-import net.kdt.pojavlaunch.value.MinecraftAccount;
+import net.kdt.pojavlaunch.authenticator.AuthType;
+import net.kdt.pojavlaunch.authenticator.accounts.Account;
+import net.kdt.pojavlaunch.authenticator.accounts.Accounts;
+import net.kdt.pojavlaunch.fragments.ElyByLoginFragment;
+import net.kdt.pojavlaunch.fragments.LocalLoginFragment;
+import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
 
-import java.io.File;
-import java.net.URI;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-/**
- * Skin & Account. Uses only the existing account store (Tools.DIR_ACCOUNT_NEW json files +
- * PojavProfile). MinecraftAccount has a skinUrl field and no cape field, so cape is shown as
- * unsupported instead of pretending to work.
- */
+/** Account screen: real Microsoft / Ely.by / Offline login paths from the existing account system. */
 public class RkbSkinFragment extends Fragment {
-    private final Handler mMain = new Handler(Looper.getMainLooper());
-    private ExecutorService mExecutor;
-    private EditText mSkinInput;
-    private int mSkinRequest;
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        mExecutor = Executors.newSingleThreadExecutor();
-        final Context c = requireContext();
-        final MinecraftAccount acc = RkbUi.currentAccount(c);
+        final android.content.Context c = requireContext();
 
         LinearLayout body = new LinearLayout(c);
         body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(RkbUi.dp(c, 14), RkbUi.dp(c, 8), RkbUi.dp(c, 14), RkbUi.dp(c, 18));
 
-        // ---- current account
-        LinearLayout accCard = RkbUi.card(c);
-        accCard.addView(RkbUi.text(c, "Current account", 12, RkbUi.MUTED, true));
-        LinearLayout accRow = new LinearLayout(c);
-        accRow.setGravity(Gravity.CENTER_VERTICAL);
-        accRow.setPadding(0, RkbUi.dp(c, 8), 0, RkbUi.dp(c, 8));
-        View avatar = buildAvatar(c, acc);
-        accRow.addView(avatar, new LinearLayout.LayoutParams(RkbUi.dp(c, 52), RkbUi.dp(c, 52)));
+        body.addView(loginCard(c), lp(c));
+        body.addView(RkbUi.spacer(c, 12));
+        body.addView(currentCard(c), lp(c));
+        body.addView(RkbUi.spacer(c, 12));
+        body.addView(tipCard(c), lp(c));
+
+        ScrollView scroll = new ScrollView(c);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(body, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return RkbUi.scaffold(c, RkbNav.Dest.SKIN, "Account",
+                "Sign in and manage your player.", scroll);
+    }
+
+    private static LinearLayout.LayoutParams lp(android.content.Context c) {
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private View loginCard(android.content.Context c) {
+        LinearLayout card = RkbUi.card(c);
+        card.addView(RkbUi.text(c, "SIGN IN METHOD", 11, RkbUi.BLUE, true));
+        card.addView(RkbUi.spacer(c, 10));
+
+        addMethod(c, card, "Microsoft", "Owns and downloads Minecraft: Java Edition",
+                AuthType.MICROSOFT.iconResource, () ->
+                        open(MicrosoftLoginFragment.class, MicrosoftLoginFragment.TAG));
+        addMethod(c, card, "Ely.by", "Alternative authentication service",
+                AuthType.ELY_BY.iconResource, () ->
+                        open(ElyByLoginFragment.class, ElyByLoginFragment.TAG));
+        addMethod(c, card, "Offline", "Play locally without an online account",
+                R.drawable.ic_pojav_full, () ->
+                        open(LocalLoginFragment.class, LocalLoginFragment.TAG));
+        return card;
+    }
+
+    private void addMethod(android.content.Context c, LinearLayout parent, String title,
+                           String subtitle, int iconRes, Runnable action) {
+        LinearLayout row = new LinearLayout(c);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(RkbUi.dp(c, 12), RkbUi.dp(c, 12), RkbUi.dp(c, 12), RkbUi.dp(c, 12));
+        row.setBackground(RkbUi.ripple(c, RkbUi.rounded(c, RkbUi.CARD_2, 14, RkbUi.BORDER, 1)));
+        row.setClickable(true);
+        row.setOnClickListener(v -> action.run());
+        RkbMotion.press(row);
+
+        ImageView icon = new ImageView(c);
+        icon.setImageResource(iconRes);
+        icon.setPadding(RkbUi.dp(c, 8), RkbUi.dp(c, 8), RkbUi.dp(c, 8), RkbUi.dp(c, 8));
+        icon.setBackground(RkbUi.rounded(c, 0x44FFFFFF, 12, 0, 0));
+        row.addView(icon, new LinearLayout.LayoutParams(RkbUi.dp(c, 44), RkbUi.dp(c, 44)));
+
+        LinearLayout names = new LinearLayout(c);
+        names.setOrientation(LinearLayout.VERTICAL);
+        names.setPadding(RkbUi.dp(c, 12), 0, 0, 0);
+        names.addView(RkbUi.text(c, title, 15, RkbUi.WHITE, true));
+        names.addView(RkbUi.text(c, subtitle, 11, RkbUi.MUTED, false));
+        row.addView(names, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        parent.addView(row, lp(c));
+    }
+
+    private View currentCard(android.content.Context c) {
+        LinearLayout card = RkbUi.card(c);
+        final Account acc = RkbUi.currentAccount(c);
+        card.addView(RkbUi.text(c, "CURRENT ACCOUNT", 11, RkbUi.BLUE, true));
+
+        LinearLayout row = new LinearLayout(c);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, RkbUi.dp(c, 10), 0, RkbUi.dp(c, 10));
+
+        ImageView face = new ImageView(c);
+        Bitmap skinFace = null;
+        try { if (acc != null) skinFace = acc.getSkinFace(); } catch (Exception ignored) { }
+        if (skinFace != null) {
+            face.setImageBitmap(skinFace);
+            face.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        } else {
+            String initial = RkbUi.accountName(c).substring(0, 1).toUpperCase(Locale.ROOT);
+            TextView letter = RkbUi.text(c, initial, 24, RkbUi.BLUE, true);
+            letter.setGravity(Gravity.CENTER);
+            face.setImageDrawable(null);
+            row.addView(letter, new LinearLayout.LayoutParams(
+                    RkbUi.dp(c, 52), RkbUi.dp(c, 52)));
+        }
+        if (skinFace != null) {
+            row.addView(face, new LinearLayout.LayoutParams(RkbUi.dp(c, 52), RkbUi.dp(c, 52)));
+        }
+
         LinearLayout names = new LinearLayout(c);
         names.setOrientation(LinearLayout.VERTICAL);
         names.setPadding(RkbUi.dp(c, 12), 0, 0, 0);
         names.addView(RkbUi.text(c, RkbUi.accountName(c), 17, RkbUi.WHITE, true));
-        names.addView(RkbUi.text(c, RkbUi.accountBadge(c), 11, RkbUi.BLUE, true));
-        accRow.addView(names, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        accCard.addView(accRow);
+        names.addView(RkbUi.text(c, RkbUi.accountBadge(c), 11, RkbUi.GREEN, true));
+        row.addView(names, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        card.addView(row, lp(c));
 
-        LinearLayout accButtons = new LinearLayout(c);
-        TextView sw = RkbUi.button(c, "Switch account", false, v -> showSwitchDialog());
-        TextView add = RkbUi.button(c, "Add account", true, v -> {
-            if (isAdded()) Tools.swapFragment(requireActivity(), SelectAuthFragment.class, SelectAuthFragment.TAG, null);
-        });
-        LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f);
-        l1.rightMargin = RkbUi.dp(c, 8);
-        accButtons.addView(sw, l1);
-        accButtons.addView(add, new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f));
-        accCard.addView(accButtons);
-        body.addView(accCard);
-
-        // ---- skin preview (official profile skin for Microsoft accounts, default skin otherwise)
-        LinearLayout previewCard = RkbUi.card(c);
-        previewCard.addView(RkbUi.text(c, "Skin preview", 12, RkbUi.MUTED, true));
-        final RkbSkinView skinView = new RkbSkinView(c);
-        LinearLayout.LayoutParams svlp = new LinearLayout.LayoutParams(RkbUi.dp(c, 120), RkbUi.dp(c, 170));
-        svlp.gravity = Gravity.CENTER_HORIZONTAL;
-        svlp.topMargin = RkbUi.dp(c, 8);
-        previewCard.addView(skinView, svlp);
-        final TextView skinNote2 = RkbUi.text(c, "Loading skin...", 11, RkbUi.MUTED, false);
-        skinNote2.setGravity(Gravity.CENTER);
-        previewCard.addView(skinNote2);
-        LinearLayout.LayoutParams pclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        pclp.topMargin = RkbUi.dp(c, 10);
-        body.addView(previewCard, pclp);
-        final int request = ++mSkinRequest;
-        RkbSkinLoader.load(c, acc, result -> {
-            if (request != mSkinRequest || !isAdded() || getView() == null) return; // view gone or account changed
-            skinView.setSkin(result.skin, result.slim);
-            skinNote2.setText(result.note != null ? result.note
-                    : (result.isDefault ? "Default skin" : "Skin of the signed-in profile"));
-        });
-
-        // ---- skin url
-        LinearLayout skinCard = RkbUi.card(c);
-        skinCard.addView(RkbUi.text(c, "Skin URL", 12, RkbUi.MUTED, true));
-        mSkinInput = new EditText(c);
-        mSkinInput.setHint("https://example.com/skin.png");
-        mSkinInput.setHintTextColor(RkbUi.MUTED);
-        mSkinInput.setTextColor(RkbUi.WHITE);
-        mSkinInput.setTextSize(13);
-        mSkinInput.setSingleLine(true);
-        mSkinInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        mSkinInput.setPadding(RkbUi.dp(c, 12), 0, RkbUi.dp(c, 12), 0);
-        mSkinInput.setBackground(RkbUi.rounded(c, RkbUi.CARD_2, 10, RkbUi.BORDER, 1));
-        if (acc != null && acc.skinUrl != null) mSkinInput.setText(acc.skinUrl);
-        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, RkbUi.dp(c, 42));
-        ilp.topMargin = RkbUi.dp(c, 8);
-        skinCard.addView(mSkinInput, ilp);
-
-        LinearLayout skinButtons = new LinearLayout(c);
-        TextView clear = RkbUi.button(c, "Clear", false, v -> saveSkinUrl(acc, ""));
-        TextView apply = RkbUi.button(c, "Save", true, v -> saveSkinUrl(acc, mSkinInput.getText().toString()));
-        LinearLayout.LayoutParams s1 = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f);
-        s1.rightMargin = RkbUi.dp(c, 8);
-        s1.topMargin = RkbUi.dp(c, 8);
-        LinearLayout.LayoutParams s2 = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f);
-        s2.topMargin = RkbUi.dp(c, 8);
-        skinButtons.addView(clear, s1);
-        skinButtons.addView(apply, s2);
-        skinCard.addView(skinButtons);
-        TextView skinNote = RkbUi.text(c, "The URL is stored on this account. Not every server accepts custom skin URLs.",
-                11, RkbUi.MUTED, false);
-        skinNote.setPadding(0, RkbUi.dp(c, 6), 0, 0);
-        skinCard.addView(skinNote);
-        LinearLayout.LayoutParams sclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        sclp.topMargin = RkbUi.dp(c, 10);
-        body.addView(skinCard, sclp);
-
-        // ---- cape (not supported by the account model)
-        LinearLayout capeCard = RkbUi.card(c);
-        capeCard.setAlpha(0.75f);
-        capeCard.addView(RkbUi.text(c, "Cape", 12, RkbUi.MUTED, true));
-        TextView capeMsg = RkbUi.text(c, "Cape URLs are not supported by this launcher's account system yet, "
-                + "so this option is disabled instead of pretending to work.", 12, RkbUi.WHITE, false);
-        capeMsg.setPadding(0, RkbUi.dp(c, 6), 0, 0);
-        capeCard.addView(capeMsg);
-        LinearLayout.LayoutParams cclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cclp.topMargin = RkbUi.dp(c, 10);
-        body.addView(capeCard, cclp);
-
-        ScrollView sv = new ScrollView(c);
-        sv.setVerticalScrollBarEnabled(false);
-        sv.addView(body);
-        return RkbUi.scaffold(c, RkbNav.Dest.SKIN, "Skin & Account",
-                "Manage your skin and account settings.", sv);
+        LinearLayout buttons = new LinearLayout(c);
+        TextView switchBtn = RkbUi.button(c, "SWITCH", false, v -> showSwitchDialog());
+        TextView refresh = RkbUi.button(c, "REFRESH SKIN", false, v -> refreshSkin(acc));
+        TextView remove = RkbUi.button(c, "REMOVE", false, v -> removeAccount(acc));
+        LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f);
+        LinearLayout.LayoutParams b2 = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1.3f);
+        LinearLayout.LayoutParams b3 = new LinearLayout.LayoutParams(0, RkbUi.dp(c, 42), 1f);
+        b2.leftMargin = RkbUi.dp(c, 6);
+        b3.leftMargin = RkbUi.dp(c, 6);
+        buttons.addView(switchBtn, b1);
+        buttons.addView(refresh, b2);
+        buttons.addView(remove, b3);
+        card.addView(buttons, lp(c));
+        return card;
     }
 
-    private View buildAvatar(Context c, @Nullable MinecraftAccount acc) {
-        Bitmap face = null;
-        try { if (acc != null) face = acc.getSkinFace(); } catch (Exception ignored) { }
-        if (face != null) {
-            ImageView iv = new ImageView(c);
-            iv.setImageBitmap(face);
-            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            iv.setBackground(RkbUi.rounded(c, RkbUi.CARD_2, 12, RkbUi.BORDER, 1));
-            return iv;
-        }
-        String name = RkbUi.accountName(c);
-        TextView t = RkbUi.text(c, name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT), 22, RkbUi.BLUE, true);
-        t.setGravity(Gravity.CENTER);
-        t.setBackground(RkbUi.rounded(c, RkbUi.CARD_2, 12, RkbUi.BORDER, 1));
-        return t;
+    private View tipCard(android.content.Context c) {
+        LinearLayout card = RkbUi.card(c);
+        card.setBackground(RkbUi.rounded(c, 0xCC1B4B7A, 18, RkbUi.BORDER, 1));
+        card.addView(RkbUi.text(c, "TIP", 11, RkbUi.WHITE, true));
+        TextView text = RkbUi.text(c,
+                "A Microsoft account is required to download Minecraft files. Offline accounts can play versions already installed on this device.",
+                12, RkbUi.WHITE, false);
+        text.setPadding(0, RkbUi.dp(c, 6), 0, 0);
+        card.addView(text);
+        return card;
     }
 
-    // ---------------------------------------------------------------- switching
+    private void open(Class<? extends Fragment> fragmentClass, String tag) {
+        if (isAdded()) Tools.swapFragment(requireActivity(), fragmentClass, tag, null);
+    }
 
     private void showSwitchDialog() {
-        final Context c = requireContext();
-        File dir = new File(Tools.DIR_ACCOUNT_NEW);
-        File[] files = dir.listFiles((d, n) -> n.endsWith(".json"));
-        final List<String> names = new ArrayList<>();
-        if (files != null) {
-            for (File f : files) names.add(f.getName().substring(0, f.getName().length() - 5));
-        }
-        if (names.isEmpty()) {
-            Toast.makeText(c, "No saved accounts. Use Add account.", Toast.LENGTH_SHORT).show();
+        final android.content.Context c = requireContext();
+        final List<Account> accounts = new ArrayList<>();
+        try { accounts.addAll(Accounts.load().accounts); } catch (IOException ignored) { }
+        if (accounts.isEmpty()) {
+            Toast.makeText(c, "No saved accounts. Add one first.", Toast.LENGTH_SHORT).show();
             return;
         }
-        String[] arr = names.toArray(new String[0]);
-        Arrays.sort(arr, String.CASE_INSENSITIVE_ORDER);
+        String[] labels = new String[accounts.size()];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = accounts.get(i).username + " (" + RkbUi.accountBadge(accounts.get(i)) + ")";
+        }
         new AlertDialog.Builder(c)
                 .setTitle("Switch account")
-                .setItems(arr, (d, which) -> {
-                    PojavProfile.setCurrentProfile(c, arr[which]);
-                    if (isAdded()) {
-                        // Rebuild every view that shows the account (header, this screen) by reopening it.
-                        requireActivity().getSupportFragmentManager().beginTransaction()
-                                .setReorderingAllowed(true)
-                                .detach(this).commit();
-                        requireActivity().getSupportFragmentManager().beginTransaction()
-                                .setReorderingAllowed(true)
-                                .attach(this).commit();
-                    }
+                .setItems(labels, (d, which) -> {
+                    Accounts.setCurrent(accounts.get(which));
+                    Toast.makeText(c, "Switched to " + accounts.get(which).username,
+                            Toast.LENGTH_SHORT).show();
+                    if (isAdded()) recreateScreen();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
-    // ---------------------------------------------------------------- skin URL
-
-    /** @return null if valid (or empty = clear), otherwise a user-facing error. */
-    static String validateSkinUrl(String raw) {
-        if (raw.isEmpty()) return null;
-        if (raw.length() > 2048) return "URL is too long";
-        if (raw.contains(" ")) return "URL must not contain spaces";
-        try {
-            URI u = new URI(raw);
-            String scheme = u.getScheme();
-            if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
-                return "URL must start with http:// or https://";
-            }
-            if (u.getHost() == null || u.getHost().isEmpty()) return "URL has no host name";
-        } catch (Exception e) {
-            return "That is not a valid URL";
-        }
-        return null;
-    }
-
-    private void saveSkinUrl(@Nullable final MinecraftAccount acc, String input) {
-        final Context c = requireContext();
+    private void refreshSkin(final Account acc) {
         if (acc == null) {
-            Toast.makeText(c, "Select or add an account first", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "No account selected", Toast.LENGTH_SHORT).show();
             return;
         }
-        final String url = input.trim();
-        String error = validateSkinUrl(url);
-        if (error != null) {
-            mSkinInput.setError(error);
-            return;
-        }
-        if (mExecutor == null) return;
-        if (url.isEmpty()) mSkinInput.setText("");
-        try {
-            mExecutor.execute(() -> {
-                String result;
-                try {
-                    acc.skinUrl = url.isEmpty() ? null : url;
-                    acc.save();
-                    result = url.isEmpty() ? "Skin URL cleared" : "Skin URL saved to this account";
-                } catch (Exception e) {
-                    result = "Could not save: " + e.getMessage();
-                }
-                final String msg = result;
-                mMain.post(() -> { if (isAdded()) Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show(); });
-            });
-        } catch (java.util.concurrent.RejectedExecutionException ignored) { }
+        new Thread(() -> {
+            acc.updateSkinFace();
+            if (isAdded()) mMain.post(this::recreateScreen);
+        }, "rkb-skin-refresh").start();
     }
 
-    @Override
-    public void onDestroyView() {
-        mSkinRequest++; // drop any pending skin callback
-        mMain.removeCallbacksAndMessages(null);
-        if (mExecutor != null) mExecutor.shutdown(); // let an in-flight account save finish
-        mExecutor = null;
-        mSkinInput = null;
-        super.onDestroyView();
+    private final android.os.Handler mMain = new android.os.Handler(android.os.Looper.getMainLooper());
+
+    private void removeAccount(final Account acc) {
+        if (acc == null) {
+            Toast.makeText(requireContext(), "No account selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Remove account?")
+                .setMessage(acc.username)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("Remove", (d, w) -> {
+                    Accounts.delete(acc);
+                    Toast.makeText(requireContext(), "Account removed", Toast.LENGTH_SHORT).show();
+                    if (isAdded()) recreateScreen();
+                })
+                .show();
+    }
+
+    private void recreateScreen() {
+        if (!isAdded() || getActivity() == null) return;
+        getActivity().getSupportFragmentManager().beginTransaction()
+                .setReorderingAllowed(true)
+                .detach(this)
+                .attach(this)
+                .commitAllowingStateLoss();
     }
 }
