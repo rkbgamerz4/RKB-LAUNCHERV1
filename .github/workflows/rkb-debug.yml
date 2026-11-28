@@ -12,6 +12,9 @@ jobs:
         with: { distribution: temurin, java-version: "21" }
       - uses: gradle/actions/setup-gradle@v4
       # compileSdk is 37.2 and NDK r25 is required by the build; sdkmanager fetches them.
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install SDK parts
         run: |
           yes | sdkmanager --licenses >/dev/null || true
