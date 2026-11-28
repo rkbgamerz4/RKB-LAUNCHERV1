@@ -37,10 +37,8 @@ fun RkbDiscordCard(modifier: Modifier = Modifier) {
             TitleAndSummary(
                 modifier = Modifier.weight(1f),
                 title = "Discord Rich Presence",
-                summary = "Status: $status. Shows what you are playing on your Discord profile."
+                summary = "Automatic - no sign-in needed. Needs the Discord app installed and signed in. Status: $status."
             )
-            Button(onClick = { RkbDiscord.connect() }) { Text("Connect") }
-            OutlinedButton(onClick = { RkbDiscord.disconnect() }) { Text("Disconnect") }
         }
     }
 }

@@ -4,6 +4,8 @@
 package com.movtery.zalithlauncher.ui.screens.content
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,34 +58,46 @@ fun RkbSettingsHubScreen(
     onOpen: (TitledNavKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scheme = MaterialTheme.colorScheme
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(RkbTokens.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        RkbBar(text = "Back to home", onClick = onBackHome)
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Text("Customize your launcher experience.", style = MaterialTheme.typography.bodyMedium, color = scheme.primary)
-        hubItems.forEach { item ->
-            Surface(
-                modifier = Modifier.fillMaxWidth().clickable { onOpen(item.key) },
-                shape = RoundedCornerShape(16.dp),
-                color = scheme.surfaceContainerHigh,
-                border = BorderStroke(1.dp, scheme.outlineVariant)
-            ) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(painterResource(item.icon), contentDescription = null, tint = scheme.primary, modifier = Modifier.size(28.dp))
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(item.title, style = MaterialTheme.typography.titleMedium)
-                        Text(item.summary, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        RkbPageHeader(R.drawable.ic_settings_filled, "Settings", "Customize your launcher experience.")
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val columns = if (maxWidth >= 720.dp) 2 else 1
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                hubItems.chunked(columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { item -> HubCardItem(item, Modifier.weight(1f)) { onOpen(item.key) } }
+                        // keep the last odd card the same width as the others
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    Text("\u203A", style = MaterialTheme.typography.headlineSmall, color = scheme.primary)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HubCardItem(item: HubItem, modifier: Modifier, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RkbTokens.CardShape,
+        color = scheme.surface.copy(alpha = RkbTokens.GlassAlpha),
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = RkbTokens.BorderAlpha))
+    ) {
+        Row(Modifier.padding(14.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(painterResource(item.icon), contentDescription = null, tint = scheme.primary, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.title, style = MaterialTheme.typography.titleMedium)
+                Text(item.summary, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            Text("\u203A", style = MaterialTheme.typography.headlineSmall, color = scheme.primary)
         }
     }
 }
@@ -95,8 +109,8 @@ fun RkbBar(text: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = scheme.surfaceContainer,
-        border = BorderStroke(1.dp, scheme.outlineVariant)
+        color = scheme.surface.copy(alpha = RkbTokens.GlassAlpha),
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = RkbTokens.BorderAlpha))
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("\u2190", style = MaterialTheme.typography.titleMedium, color = scheme.primary)

@@ -1,6 +1,13 @@
 /*
- * RKB LAUNCHER - Discord Rich Presence via the Discord Social SDK.
- * Tokens are kept only in this app's private SharedPreferences and are never logged or shown.
+ * RKB LAUNCHER - automatic Discord Rich Presence via the official Discord Social SDK (1.10+).
+ *
+ * No sign-in of any kind: no OAuth, no tokens, no Connect button. The SDK hands the activity to
+ * the Discord app on this device (Client::UpdateRichPresence while not connected), using only the
+ * public application ID below. Requirements: the Discord app must be installed and signed in;
+ * otherwise nothing is shown and the launcher is unaffected.
+ *
+ * Lifecycle: presence is set when Minecraft launches, cleared when the game process exits, and
+ * cleared when the launcher goes to the background without a running game.
  */
 package com.movtery.zalithlauncher.utils
 
@@ -17,26 +24,25 @@ object RkbDiscord {
     /** Public application (client) ID of the RKB LAUNCHER Discord application. Not a secret. */
     const val APP_ID = 1555829146490241095L
 
-    private const val PREFS = "rkb_discord"
-    private const val KEY_ACCESS = "access"
-
-    private val _status = MutableStateFlow("Not connected")
+    private val _status = MutableStateFlow("Starting...")
+    /** Human-readable state for the (read-only) settings line. */
     val status: StateFlow<String> = _status
 
     private val handler = Handler(Looper.getMainLooper())
     private var loaded = false
-    private var ready = false
+    private var discordInstalled: Boolean? = null
     private var appContext: Context? = null
+
     private var details = "In the launcher"
     private var state = "RKB LAUNCHER"
     private var startSeconds = 0L
 
-    // Game-process tracking: presence says "Playing" only while the :game process is alive.
+    // Game-process tracking: "Playing" only while the :game process is alive.
     private var playing = false
     private var gameSeen = false
     private var playingSinceMs = 0L
     private var inForeground = true
-    private var suspended = false
+    private var cleared = false
     private var lastWatchMs = 0L
 
     private val pump = object : Runnable {
@@ -48,13 +54,12 @@ object RkbDiscord {
                 lastWatchMs = now
                 watchGame()
             }
-            // 10 wake-ups per second only while the launcher is on screen; 1 per second in the background
-            // so the launcher process stays idle while the game is running.
-            handler.postDelayed(this, if (inForeground) 100L else 1000L)
+            // Only needed to deliver the SDK's callbacks: slow in the foreground, slower in the background.
+            handler.postDelayed(this, if (inForeground) 500L else 2000L)
         }
     }
 
-    /** Call from the main activity. Safe to call repeatedly; failures only disable the feature. */
+    /** Call from the main activity. Safe to call repeatedly; any failure just disables the feature. */
     fun init(activity: Activity) {
         runCatching {
             DiscordSocialSdkInit.setEngineActivity(activity)
@@ -63,31 +68,16 @@ object RkbDiscord {
                 System.loadLibrary("rkb_discord")
                 nativeInit(APP_ID)
                 loaded = true
+                // Remove the access token stored by older builds that used the sign-in flow.
+                activity.applicationContext.getSharedPreferences("rkb_discord", Context.MODE_PRIVATE).edit().clear().apply()
+                nativeCheckInstalled()
                 handler.post(pump)
-                val saved = prefs()?.getString(KEY_ACCESS, null)
-                if (!saved.isNullOrEmpty()) {
-                    _status.value = "Connecting..."
-                    nativeConnectWithToken(saved)
-                }
+                setInLauncher()
             }
         }.onFailure {
             loaded = false
-            _status.value = "Discord unavailable on this build/device"
+            _status.value = "Unavailable on this build/device"
         }
-    }
-
-    /** Starts the Discord login (opens Discord or a browser tab). */
-    fun connect() {
-        if (!loaded) { _status.value = "Discord unavailable on this build/device"; return }
-        _status.value = "Waiting for Discord..."
-        runCatching { nativeAuthorize() }
-    }
-
-    fun disconnect() {
-        prefs()?.edit()?.remove(KEY_ACCESS)?.apply()
-        ready = false
-        if (loaded) runCatching { nativeDisconnect() }
-        _status.value = "Not connected"
     }
 
     fun setPlaying(versionName: String) {
@@ -122,67 +112,55 @@ object RkbDiscord {
         if (gameSeen || launchFailed) {
             playing = false
             gameSeen = false
-            if (inForeground) setInLauncher() else suspendPresence()
+            if (inForeground) setInLauncher() else clearPresence()
         }
     }
 
-    /** Launcher moved to the background (user left it). Keeps "Playing" only while a game runs. */
+    /** Launcher left the screen: keep "Playing" only while a game is actually running. */
     fun onBackground() {
         inForeground = false
-        if (!playing) suspendPresence()
+        if (!playing) clearPresence()
     }
 
-    /** Launcher is visible again. */
     fun onForeground() {
         inForeground = true
         if (playing && !isGameRunning() && System.currentTimeMillis() - playingSinceMs > 15_000) {
             playing = false
             setInLauncher()
-        }
-        if (suspended && loaded) {
-            suspended = false
-            val saved = prefs()?.getString(KEY_ACCESS, null)
-            if (!saved.isNullOrEmpty()) {
-                if (!playing) { details = "In the launcher"; startSeconds = 0L }
-                runCatching { nativeConnectWithToken(saved) }
-            }
+        } else if (cleared && !playing) {
+            setInLauncher()
         }
     }
 
-    /** Clears the presence and drops the connection, but keeps the saved login. */
-    private fun suspendPresence() {
-        // Only when connected; never interrupt a sign-in that is still in progress.
-        if (!loaded || !ready) return
-        suspended = true
-        ready = false
-        runCatching { nativeDisconnect() }
-        _status.value = "Paused (launcher in background)"
+    private fun clearPresence() {
+        if (!loaded) return
+        cleared = true
+        runCatching { nativeClear() }
     }
 
     private fun sendPresence() {
-        if (loaded && ready) runCatching { nativeSetPresence(details, state, startSeconds) }
+        if (!loaded || discordInstalled == false) return
+        cleared = false
+        runCatching { nativeSetPresence(details, state, startSeconds) }
     }
-
-    private fun prefs() = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /** Called from native code (main thread, via RunCallbacks). */
     @JvmStatic
-    fun onNativeEvent(type: String, a: String, b: String) {
+    fun onNativeEvent(type: String, a: String, @Suppress("UNUSED_PARAMETER") b: String) {
         when (type) {
-            "status" -> {
-                ready = a.equals("Ready", ignoreCase = true)
-                _status.value = if (ready) "Connected" else a
-                if (ready) sendPresence()
+            "installed" -> {
+                discordInstalled = a == "true"
+                _status.value = if (discordInstalled == true) "Discord app found" else "Discord app not installed"
+                if (discordInstalled == true) sendPresence()
             }
-            "token" -> prefs()?.edit()?.putString(KEY_ACCESS, a)?.apply()
-            "error" -> _status.value = "Error: $a"
+            "presence" -> _status.value = if (cleared) "Idle" else "Active"
+            "error" -> _status.value = "Waiting for the Discord app ($a)"
         }
     }
 
     @JvmStatic private external fun nativeInit(appId: Long)
-    @JvmStatic private external fun nativeAuthorize()
-    @JvmStatic private external fun nativeConnectWithToken(token: String)
+    @JvmStatic private external fun nativeCheckInstalled()
     @JvmStatic private external fun nativeSetPresence(details: String, state: String, startSeconds: Long)
     @JvmStatic private external fun nativeRunCallbacks()
-    @JvmStatic private external fun nativeDisconnect()
+    @JvmStatic private external fun nativeClear()
 }

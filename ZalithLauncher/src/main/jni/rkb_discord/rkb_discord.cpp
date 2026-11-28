@@ -1,4 +1,6 @@
 // RKB LAUNCHER - JNI wrapper around the Discord Social SDK (Rich Presence only).
+// Presence is sent WITHOUT authorization: the SDK hands it to the local Discord app
+// (Client::UpdateRichPresence while not connected). No OAuth, no tokens, no Client::Connect.
 #include <jni.h>
 #include <android/log.h>
 #include <memory>
@@ -26,7 +28,6 @@ static JNIEnv* getEnv() {
     return env;
 }
 
-// Never pass tokens to the log; only the Java side stores them.
 static void emit(const std::string& type, const std::string& a, const std::string& b) {
     JNIEnv* env = getEnv();
     if (env == nullptr || g_class == nullptr || g_onEvent == nullptr) return;
@@ -65,49 +66,15 @@ Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeInit(JNIEnv*, jclass, jlo
     g_appId = static_cast<uint64_t>(appId);
     g_client = std::make_shared<discordpp::Client>();
     g_client->SetApplicationId(g_appId);
-    g_client->SetStatusChangedCallback(
-        [](discordpp::Client::Status status, discordpp::Client::Error error, int32_t detail) {
-            emit("status", discordpp::Client::StatusToString(status),
-                 error == discordpp::Client::Error::None ? "" : std::to_string(detail));
-        });
 }
 
+// Reports whether the Discord app is installed ("installed" event, "true"/"false").
 extern "C" JNIEXPORT void JNICALL
-Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeAuthorize(JNIEnv*, jclass) {
+Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeCheckInstalled(JNIEnv*, jclass) {
     if (!g_client) return;
-    auto client = g_client;
-    uint64_t appId = g_appId;
-    auto verifier = client->CreateAuthorizationCodeVerifier();
-    discordpp::AuthorizationArgs args{};
-    args.SetClientId(appId);
-    args.SetScopes(discordpp::Client::GetDefaultPresenceScopes());
-    args.SetCodeChallenge(verifier.Challenge());
-    client->Authorize(args, [client, verifier, appId](discordpp::ClientResult result,
-                                                      std::string code, std::string redirectUri) {
-        if (!result.Successful()) { emit("error", "authorize: " + result.Error(), ""); return; }
-        client->GetToken(appId, code, verifier.Verifier(), redirectUri,
-            [client](discordpp::ClientResult r, std::string accessToken, std::string refreshToken,
-                     discordpp::AuthorizationTokenType, int32_t, std::string) {
-                if (!r.Successful()) { emit("error", "token: " + r.Error(), ""); return; }
-                emit("token", accessToken, refreshToken);
-                client->UpdateToken(discordpp::AuthorizationTokenType::Bearer, accessToken,
-                    [client](discordpp::ClientResult r2) {
-                        if (r2.Successful()) client->Connect();
-                        else emit("error", "update token: " + r2.Error(), "");
-                    });
-            });
+    g_client->IsDiscordAppInstalled([](bool installed) {
+        emit("installed", installed ? "true" : "false", "");
     });
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeConnectWithToken(JNIEnv* env, jclass, jstring token) {
-    if (!g_client) return;
-    auto client = g_client;
-    client->UpdateToken(discordpp::AuthorizationTokenType::Bearer, toStd(env, token),
-        [client](discordpp::ClientResult r) {
-            if (r.Successful()) client->Connect();
-            else emit("error", "saved login expired: " + r.Error(), "");
-        });
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -125,7 +92,8 @@ Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeSetPresence(JNIEnv* env, 
         activity.SetTimestamps(ts);
     }
     g_client->UpdateRichPresence(activity, [](discordpp::ClientResult r) {
-        if (!r.Successful()) emit("error", "presence: " + r.Error(), "");
+        if (r.Successful()) emit("presence", "ok", "");
+        else emit("error", "presence: " + r.Error(), "");
     });
 }
 
@@ -135,6 +103,6 @@ Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeRunCallbacks(JNIEnv*, jcl
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeDisconnect(JNIEnv*, jclass) {
-    if (g_client) { g_client->ClearRichPresence(); g_client->Disconnect(); }
+Java_com_movtery_zalithlauncher_utils_RkbDiscord_nativeClear(JNIEnv*, jclass) {
+    if (g_client) g_client->ClearRichPresence();
 }

@@ -44,19 +44,6 @@
         android:allowNativeHeapPointerTagging="false"
         tools:targetApi="33"
         tools:ignore="DiscouragedApi">
-        <!-- RKB: Discord OAuth redirect discord-<APP_ID>:/authorize/callback -->
-        <activity
-            android:name="com.discord.socialsdk.AuthenticationActivity"
-            android:exported="true"
-            tools:node="merge">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="discord-1555829146490241095" />
-            </intent-filter>
-        </activity>
-
         <activity
             android:name=".ui.activities.SplashActivity"
             android:launchMode="singleTop"
@@ -64,7 +51,7 @@
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation"
-            android:screenOrientation="sensorLandscape">
+            android:screenOrientation="fullUser">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -124,7 +111,7 @@
             android:name=".ui.activities.MainActivity"
             android:launchMode="singleTop"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation"
-            android:screenOrientation="sensorLandscape" />
+            android:screenOrientation="fullUser" />
         <activity
             android:name=".ui.activities.ControlEditorActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation"
@@ -237,7 +224,8 @@
     </application>
     <queries>
         <package android:name="net.kdt.pojavlaunch.ffmpeg"/>
-        <package android:name="dev.horizonlab.horizon"/>
+        <!-- RKB: lets the Discord SDK detect the Discord app (Rich Presence, no sign-in) -->
+        <package android:name="com.discord"/>
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>

@@ -59,6 +59,9 @@ sealed interface NormalNavKey : TitledNavKey {
     ) : NormalNavKey {
         @Contextual override val title: AndroidStringText = androidText(R.string.page_title_select_files)
     }
+    /** RKB: Mod Settings screen (per-instance mod switches) */
+    @Serializable data object ModSettings : NormalNavKey
+
     /** 多人联机屏幕 */
     @Serializable data object Multiplayer: NormalNavKey {
         @Contextual override val title: AndroidStringText = androidText(R.string.terracotta_terracotta)

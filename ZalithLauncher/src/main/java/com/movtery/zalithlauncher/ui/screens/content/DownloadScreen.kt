@@ -20,6 +20,10 @@ package com.movtery.zalithlauncher.ui.screens.content
 
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Column
 import com.movtery.zalithlauncher.ui.screens.main.RkbTabChip
 import androidx.compose.foundation.layout.Arrangement
@@ -84,13 +88,27 @@ import com.movtery.zalithlauncher.viewmodel.ScreenBackStackViewModel
  * 导航至DownloadScreen
  */
 fun ScreenBackStackViewModel.navigateToDownload(targetScreen: TitledNavKey? = null) {
-    // RKB: the category hub is the landing page; deep links go straight to their own category
+    // RKB: Download lands on the Mods browser; deep links go straight to their own category
     RkbDownloadHub.page = when {
-        targetScreen == null -> RkbDownloadHub.Page.Hub
+        targetScreen == null -> RkbDownloadHub.Page.Browse
         targetScreen === downloadModPackScreen -> RkbDownloadHub.Page.ModPack
-        else -> RkbDownloadHub.Page.Normal
+        targetScreen === downloadGameScreen -> RkbDownloadHub.Page.Normal
+        else -> RkbDownloadHub.Page.Browse
     }
-    downloadScreen.clearWith(targetScreen ?: downloadGameScreen)
+    downloadScreen.clearWith(targetScreen ?: downloadModScreen)
+    mainScreen.removeAndNavigateTo(
+        removes = clearBeforeNavKeys,
+        screenKey = downloadScreen,
+        useClassEquality = true
+    )
+}
+
+/**
+ * RKB: opens the "New Instance" chooser (Normal / Modpack / Rust Edition + RKB BOOST coming soon).
+ */
+fun ScreenBackStackViewModel.navigateToNewInstance() {
+    RkbDownloadHub.page = RkbDownloadHub.Page.Hub
+    downloadScreen.clearWith(downloadGameScreen)
     mainScreen.removeAndNavigateTo(
         removes = clearBeforeNavKeys,
         screenKey = downloadScreen,
@@ -158,36 +176,61 @@ fun DownloadScreen(
                         RkbDownloadHub.page = RkbDownloadHub.Page.ModPack
                         key.backStack.navigateOnce(backScreenViewModel.downloadModPackScreen)
                     },
-                    onRust = { RkbDownloadHub.page = RkbDownloadHub.Page.Rust },
+                    onBack = {
+                        backScreenViewModel.mainScreen.removeAndNavigateTo(
+                            removes = backScreenViewModel.clearBeforeNavKeys,
+                            screenKey = NormalNavKey.VersionsManager
+                        )
+                    },
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 )
             } else {
-                Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    RkbBar(text = "Download categories") { RkbDownloadHub.page = RkbDownloadHub.Page.Hub }
-                }
-                if (page == RkbDownloadHub.Page.Rust) {
-                    RkbHorizonScreen(modifier = Modifier.weight(1f).fillMaxWidth())
+                if (page == RkbDownloadHub.Page.Browse) {
+                    RkbDownloadHeader()
                 } else {
-                    if (page == RkbDownloadHub.Page.Normal) {
-                        TabMenu(
-                            modifier = Modifier.fillMaxWidth(),
-                            isVisible = isVisible,
-                            backStack = key.backStack,
-                            backScreenViewModel = backScreenViewModel,
-                            hideModpack = true
-                        )
+                    Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        RkbBar(text = "New Instance") { RkbDownloadHub.page = RkbDownloadHub.Page.Hub }
                     }
-
-                    NavigationUI(
-                        key = key,
+                }
+                if (page == RkbDownloadHub.Page.Browse || page == RkbDownloadHub.Page.Normal) {
+                    TabMenu(
+                        modifier = Modifier.fillMaxWidth(),
+                        isVisible = isVisible,
+                        backStack = key.backStack,
                         backScreenViewModel = backScreenViewModel,
-                        eventViewModel = eventViewModel,
-                        modpackImportViewModel = modpackImportViewModel,
-                        submitError = submitError,
-                        modifier = Modifier.weight(1f).fillMaxWidth()
+                        // Browse shows every category (Modpacks included); the Normal flow only its own tabs
+                        hideModpack = page == RkbDownloadHub.Page.Normal
                     )
                 }
+
+                NavigationUI(
+                    key = key,
+                    backScreenViewModel = backScreenViewModel,
+                    eventViewModel = eventViewModel,
+                    modpackImportViewModel = modpackImportViewModel,
+                    submitError = submitError,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun RkbDownloadHeader() {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(painterResource(R.drawable.ic_download_2_outlined), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("Download", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Explore and download mods, modpacks, resource packs, shaders and worlds",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -201,12 +244,12 @@ private fun TabMenu(
     hideModpack: Boolean = false,
 ) {
     val downloadsList = listOf(
-        CategoryItem(backScreenViewModel.downloadGameScreen, { CategoryIcon(R.drawable.ic_sports_esports_outlined, R.string.download_category_game) }, R.string.download_category_game),
+        CategoryItem(backScreenViewModel.downloadModScreen, { CategoryIcon(R.drawable.ic_extension_outlined, R.string.download_category_mod) }, R.string.download_category_mod),
         CategoryItem(backScreenViewModel.downloadModPackScreen, { CategoryIcon(R.drawable.ic_package_2_outlined, R.string.download_category_modpack) }, R.string.download_category_modpack),
-        CategoryItem(backScreenViewModel.downloadModScreen, { CategoryIcon(R.drawable.ic_extension_outlined, R.string.download_category_mod) }, R.string.download_category_mod, division = true),
         CategoryItem(backScreenViewModel.downloadResourcePackScreen, { CategoryIcon(R.drawable.ic_format_paint_outlined, R.string.download_category_resource_pack) }, R.string.download_category_resource_pack),
         CategoryItem(backScreenViewModel.downloadSavesScreen, { CategoryIcon(R.drawable.ic_public, R.string.download_category_saves) }, R.string.download_category_saves),
         CategoryItem(backScreenViewModel.downloadShadersScreen, { CategoryIcon(R.drawable.ic_lightbulb, R.string.download_category_shaders) }, R.string.download_category_shaders),
+        CategoryItem(backScreenViewModel.downloadGameScreen, { CategoryIcon(R.drawable.ic_sports_esports_outlined, R.string.download_category_game) }, R.string.download_category_game),
         CategoryItem(NormalNavKey.SearchId, { CategoryIcon(R.drawable.ic_card, R.string.download_category_by_id) }, R.string.download_category_by_id, division = true),
         CategoryItem(backScreenViewModel.downloadFavoritesScreen, { CategoryIcon(R.drawable.ic_favorite_outlined, R.string.download_category_favorites) }, R.string.download_category_favorites),
     ).filter { !(hideModpack && it.key === backScreenViewModel.downloadModPackScreen) }

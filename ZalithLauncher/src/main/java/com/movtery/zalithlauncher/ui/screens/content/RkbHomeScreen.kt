@@ -5,6 +5,16 @@
 package com.movtery.zalithlauncher.ui.screens.content
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import com.movtery.zalithlauncher.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,116 +72,93 @@ fun RkbHomeScreen(
     onOpenVersions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
     val version = VersionsManager.currentVersion.collectAsState().value
-    val wallpaperPath = AllSettings.homeWallpaper.state
-    val wallpaperFile = remember(wallpaperPath) {
-        wallpaperPath.takeIf { it.isNotBlank() }?.let { File(it) }?.takeIf { it.exists() }
-    }
+    val info = version?.getVersionInfo()
+    val loaderName = info?.primaryLoader?.loader?.displayName?.takeIf { it.isNotBlank() }
+    val mcVersion = info?.minecraftVersion
 
-    var freeRam by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            freeRam = withContext(Dispatchers.IO) { runCatching { getFreeMemory(context) }.getOrNull() }
-            delay(5000)
-        }
-    }
-    val rendererName = remember(AllSettings.renderer.state) {
-        runCatching { Renderers.getCurrentRenderer().getRendererName() }.getOrNull()
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF0B1E45), Color(0xFF3B2A5E), Color(0xFF05070C))))
+    BoxWithConstraints(
+        modifier = modifier.fillMaxSize()
     ) {
-        if (wallpaperFile != null) {
-            RkbWallpaperView(file = wallpaperFile, modifier = Modifier.fillMaxSize())
-        }
-        // readability scrim on the left, where the text sits
+        val wide = maxWidth >= 600.dp
+        // bottom-left scrim keeps the title readable on any wallpaper
         Box(
-            Modifier
-                .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(Color(0xCC05070C), Color.Transparent)))
+            Modifier.fillMaxSize().background(
+                Brush.linearGradient(listOf(Color(0xCC05070C), Color.Transparent), start = Offset(0f, Float.POSITIVE_INFINITY), end = Offset(Float.POSITIVE_INFINITY, 0f))
+            )
         )
+
+        // Upcoming features: right column in landscape, a row above the title in portrait.
+        if (wide) {
+            Column(
+                Modifier.align(Alignment.BottomEnd).padding(20.dp).width(230.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                RkbUpcoming.entries.forEach { RkbComingSoonCard(it, Modifier.fillMaxWidth()) }
+            }
+        }
 
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(24.dp)
-                .widthIn(max = 340.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .widthIn(max = if (wide) 420.dp else 600.dp)
         ) {
+            if (!wide) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RkbUpcoming.entries.forEach { RkbComingSoonCard(it, Modifier.weight(1f)) }
+                }
+                Spacer(Modifier.height(18.dp))
+            }
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = scheme.primary)) { append("RKB ") }
-                    append("LAUNCHER")
+                    if (mcVersion != null) {
+                        append(mcVersion)
+                        if (loaderName != null) {
+                            append(" ")
+                            withStyle(SpanStyle(color = scheme.primary)) { append(loaderName) }
+                        }
+                    } else append("No instance")
                 },
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Black,
-                color = Color.White
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "PLAY  \u2022  EXPLORE  \u2022  CREATE",
-                style = MaterialTheme.typography.labelMedium,
-                color = scheme.secondary,
-                letterSpacing = 3.sp
+                text = version?.getVersionName() ?: "Tap the options button to choose or create one",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.8f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(14.dp))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenVersions),
-                shape = RoundedCornerShape(14.dp),
-                color = scheme.surfaceContainerHigh.copy(alpha = 0.9f),
-                border = BorderStroke(1.dp, scheme.outline)
-            ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                    Text(
-                        text = version?.getVersionName() ?: "No instance selected",
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = version?.getVersionInfo()?.minecraftVersion ?: "Tap to choose or create one",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onPlay,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = scheme.primaryContainer,
+                        contentColor = scheme.onPrimaryContainer
+                    ),
+                    border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.7f))
+                ) {
+                    Icon(painterResource(R.drawable.ic_play_arrow_filled), null, Modifier.size(24.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Launch", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
-            }
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = onPlay,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = scheme.primaryContainer,
-                    contentColor = scheme.onPrimaryContainer
-                )
-            ) {
-                Text("\u25B6  PLAY", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            }
-        }
-
-        Surface(
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = scheme.surface.copy(alpha = 0.85f),
-            border = BorderStroke(1.dp, scheme.outlineVariant)
-        ) {
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF2FE37A)))
-                    Spacer(Modifier.size(8.dp))
-                    val ram = freeRam?.let { String.format(Locale.US, "%.1f GB", it / 1024.0 / 1024.0 / 1024.0) } ?: "..."
-                    Text("RAM free $ram", style = MaterialTheme.typography.labelMedium)
+                OutlinedIconButton(
+                    onClick = onOpenVersions,
+                    modifier = Modifier.size(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, scheme.outline)
+                ) {
+                    Icon(painterResource(R.drawable.ic_settings_filled), contentDescription = "Choose or manage instance", tint = Color.White)
                 }
-                Text(
-                    text = "Renderer ${rendererName ?: "-"}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = scheme.secondary
-                )
             }
         }
     }

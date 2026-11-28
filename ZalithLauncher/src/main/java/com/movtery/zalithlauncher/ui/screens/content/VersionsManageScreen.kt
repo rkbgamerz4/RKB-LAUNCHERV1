@@ -317,7 +317,7 @@ fun VersionsManageScreen(
                     viewModel.resortVersions()
                 },
                 onInstall = {
-                    backScreenViewModel.navigateToDownload()
+                    backScreenViewModel.navigateToNewInstance()
                 }
             )
 

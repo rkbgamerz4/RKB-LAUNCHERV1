@@ -20,6 +20,16 @@ package com.movtery.zalithlauncher.ui.screens.content
 
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Box
+import com.movtery.zalithlauncher.game.account.isLocalAccount
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Button
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -226,40 +236,209 @@ private fun AccountManageContent(
     operationUiState: AccountManageViewModel.OperationUiState,
     actions: AccountActions,
 ) {
-    Row(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        ActionsLayout(
-            isVisible = isVisible,
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(all = 12.dp)
-                .weight(3f),
-            currentAccount = profileUiState.currentAccount,
-            actions = actions
-        )
-
-        AccountsLayout(
-            isVisible = isVisible,
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(top = 12.dp, end = 12.dp, bottom = 12.dp)
-                .weight(7f),
-            accounts = profileUiState.accounts,
-            currentAccount = profileUiState.currentAccount,
-            accountOperation = operationUiState.accountOp,
-            accountSkinOperation = operationUiState.accountSkinOp,
-            accountSkinDialogState = operationUiState.accountSkinDialogState,
-            accountCapes = profileUiState.accountCapeOpMap,
-            actions = actions
-        )
-    }
+    RkbAccountContent(
+        isVisible = isVisible,
+        profileUiState = profileUiState,
+        operationUiState = operationUiState,
+        actions = actions
+    )
 
     LoginMenuOperation(loginUiState.menuOp, actions, profileUiState.authServers)
     MicrosoftLoginOperation(loginUiState.microsoftOp, actions)
     LocalLoginOperation(loginUiState.localOp, actions)
     OtherLoginOperation(loginUiState.otherOp, actions)
     ServerTypeOperation(operationUiState.serverOp, actions)
+}
+
+private const val ELY_BY_AUTH_URL = "https://authserver.ely.by/api/authlib-injector"
+
+/**
+ * RKB layout for the account screen (reference: Account). Every button drives the same
+ * intents/operations as the old screen, so login, saved accounts and skins keep working.
+ */
+@Composable
+private fun RkbAccountContent(
+    isVisible: Boolean,
+    profileUiState: AccountManageViewModel.ProfileUiState,
+    operationUiState: AccountManageViewModel.OperationUiState,
+    actions: AccountActions,
+) {
+    val current = profileUiState.currentAccount
+    var showAccounts by rememberSaveable { mutableStateOf(false) }
+    val scheme = MaterialTheme.colorScheme
+    val elyServer = profileUiState.authServers.firstOrNull { it.baseUrl.contains("ely.by", ignoreCase = true) }
+    var elyHint by rememberSaveable { mutableStateOf(false) }
+
+    val loginMethods: @Composable (Modifier) -> Unit = { mod ->
+        RkbGlassCard(mod) {
+            Text("Login Methods", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            RkbLoginRow("Microsoft Account", "Login with your Microsoft account.", R.drawable.ic_person_outlined) {
+                if (!isMicrosoftLogging()) {
+                    actions.onIntent(AccountManageIntent.UpdateMicrosoftLoginOp(MicrosoftLoginOperation.Tip))
+                }
+            }
+            RkbLoginRow("Ely.by Account", "Login with Ely.by account.", R.drawable.ic_person_outlined) {
+                if (elyServer != null) {
+                    elyHint = false
+                    actions.onIntent(AccountManageIntent.UpdateOtherLoginOp(OtherLoginOperation.OnLogin(elyServer)))
+                } else {
+                    // First use: register the Ely.by authlib-injector server, then the user taps Login again.
+                    elyHint = true
+                    actions.onIntent(AccountManageIntent.AddServer(ELY_BY_AUTH_URL))
+                }
+            }
+            if (elyHint && elyServer == null) {
+                Text("Adding Ely.by... tap Login again once it has been added.", style = MaterialTheme.typography.bodySmall, color = scheme.primary)
+            }
+            RkbLoginRow("Offline Account", "Play without an account.", R.drawable.ic_videogame_asset_outlined) {
+                actions.onIntent(AccountManageIntent.UpdateLocalLoginOp(LocalLoginOperation.Edit))
+            }
+            Text(
+                "Other authentication servers can still be added from the account list.",
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant
+            )
+            RkbLoginRow("Other server", "Add or use another authlib-injector server.", R.drawable.ic_extension_outlined) {
+                actions.onIntent(AccountManageIntent.UpdateLoginMenuOp(LoginMenuOperation.Login))
+            }
+        }
+    }
+
+    val currentCard: @Composable (Modifier) -> Unit = { mod ->
+        RkbGlassCard(mod) {
+            Text("Current Account", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (current == null) {
+                Text(stringResource(R.string.account_no_account), color = scheme.onSurfaceVariant)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    com.movtery.zalithlauncher.ui.screens.content.elements.PlayerFace(
+                        modifier = Modifier.clip(MaterialTheme.shapes.medium),
+                        account = current,
+                        avatarSize = 64.dp
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(current.username, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(
+                            when {
+                                current.isLocalAccount() -> "Local Account"
+                                current.isMicrosoftAccount() -> "Microsoft Account"
+                                else -> "Authentication server account"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = scheme.primary
+                        )
+                        Text("Play as: ${current.username}", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 1)
+                    }
+                }
+                if (!current.isAuthServerAccount()) {
+                    Button(
+                        onClick = {
+                            actions.onIntent(AccountManageIntent.UpdateAccountSkinOp(AccountSkinOperation.ChangeSkin(current)))
+                        },
+                        shape = RkbTokens.ButtonShape
+                    ) { Text("Change Skin") }
+                }
+            }
+        }
+    }
+
+    val optionsCard: @Composable (Modifier) -> Unit = { mod ->
+        RkbGlassCard(mod) {
+            Text("Account Options", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (current != null) {
+                RkbLoginRow("Sign Out", "Remove this account from the launcher.", R.drawable.ic_person_outlined, "Remove") {
+                    actions.onIntent(AccountManageIntent.UpdateAccountOp(AccountOperation.Delete(current)))
+                }
+            }
+            RkbLoginRow(
+                "Manage Accounts", "Add or switch accounts.", R.drawable.ic_person_outlined,
+                if (showAccounts) "Hide" else "Open"
+            ) { showAccounts = !showAccounts }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(RkbTokens.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        RkbPageHeader(R.drawable.ic_person_outlined, "Account", "Manage your account and login options.")
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            if (maxWidth >= 720.dp) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    loginMethods(Modifier.weight(1f))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        currentCard(Modifier.fillMaxWidth())
+                        optionsCard(Modifier.fillMaxWidth())
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    currentCard(Modifier.fillMaxWidth())
+                    loginMethods(Modifier.fillMaxWidth())
+                    optionsCard(Modifier.fillMaxWidth())
+                }
+            }
+        }
+        if (showAccounts) {
+            AccountsLayout(
+                isVisible = isVisible,
+                modifier = Modifier.fillMaxWidth().height(420.dp),
+                accounts = profileUiState.accounts,
+                currentAccount = current,
+                accountOperation = operationUiState.accountOp,
+                accountSkinOperation = operationUiState.accountSkinOp,
+                accountSkinDialogState = operationUiState.accountSkinDialogState,
+                accountCapes = profileUiState.accountCapeOpMap,
+                actions = actions
+            )
+        } else {
+            // Operation dialogs (delete / skin) must stay mounted even when the list is hidden.
+            AccountOperation(operationUiState.accountOp, actions)
+            AccountSkinOperation(
+                accountSkinOperation = operationUiState.accountSkinOp,
+                skinDialogState = operationUiState.accountSkinDialogState,
+                accountCapes = profileUiState.accountCapeOpMap,
+                actions = actions
+            )
+        }
+        RkbGlassCard(Modifier.fillMaxWidth()) {
+            Text(
+                "Tip: use a Microsoft or Ely.by account to get the full Minecraft experience.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun RkbLoginRow(
+    title: String,
+    subtitle: String,
+    icon: Int,
+    buttonText: String = "Login",
+    onClick: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = scheme.surfaceContainerHigh.copy(alpha = 0.55f)
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Icon(painterResource(icon), null, tint = scheme.primary, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            Button(onClick = onClick, shape = RkbTokens.ButtonShape, modifier = Modifier.heightIn(min = 44.dp)) {
+                Text(buttonText, maxLines = 1, softWrap = false)
+            }
+        }
+    }
 }
 
 /**

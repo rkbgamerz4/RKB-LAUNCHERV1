@@ -5,6 +5,9 @@
 package com.movtery.zalithlauncher.ui.screens.content
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,8 +20,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -69,9 +73,6 @@ fun RkbInstancesScreen(
     val allVersions by VersionsManager.versions.collectAsStateWithLifecycle()
     val current by VersionsManager.currentVersion.collectAsStateWithLifecycle()
 
-    val appContext = androidx.compose.ui.platform.LocalContext.current
-    val horizonVersion = remember { com.movtery.zalithlauncher.utils.RkbHorizon.installedVersion(appContext) }
-
     var query by remember { mutableStateOf("") }
     var sort by remember { mutableIntStateOf(0) } // 0 default order, 1 name A-Z, 2 name Z-A
     var loaderChoice by remember { mutableStateOf(LOADER_ALL) }
@@ -101,9 +102,6 @@ fun RkbInstancesScreen(
             }
     }
 
-    val showHorizon = horizonVersion != null && loaderChoice == LOADER_ALL &&
-        (query.isBlank() || "horizon rust edition".contains(query.trim(), ignoreCase = true))
-
     BaseScreen(
         screenKey = NormalNavKey.VersionsManager,
         currentKey = backScreenViewModel.mainScreen.currentKey
@@ -118,18 +116,7 @@ fun RkbInstancesScreen(
             modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_folder_outlined), null, tint = scheme.primary, modifier = Modifier.size(34.dp))
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("Instances", style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Manage your Minecraft instances. Create, edit or launch your worlds.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.primary
-                    )
-                }
-            }
+            RkbPageHeader(R.drawable.ic_folder_outlined, "Instances", "Manage your Minecraft instances")
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
@@ -140,6 +127,21 @@ fun RkbInstancesScreen(
                     shape = RoundedCornerShape(14.dp),
                     placeholder = { Text("Search instances...") }
                 )
+                Button(
+                    onClick = { backScreenViewModel.navigateToNewInstance() },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.heightIn(min = 52.dp)
+                ) {
+                    Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Create Instance", maxLines = 1, softWrap = false)
+                }
+            }
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 RkbDropdown(
                     label = listOf("Default order", "Name A-Z", "Name Z-A")[sort],
                     options = listOf("Default order", "Name A-Z", "Name Z-A").mapIndexed { i, t -> t to { sort = i } }
@@ -152,31 +154,22 @@ fun RkbInstancesScreen(
                     label = loaders.firstOrNull { it.second == loaderChoice }?.first ?: "All Loaders",
                     options = loaders.map { (name, id) -> name to { loaderChoice = id } }
                 )
-                Button(
-                    onClick = { backScreenViewModel.navigateToDownload() },
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("New")
-                }
             }
 
             Surface(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = scheme.surface,
-                border = BorderStroke(1.dp, scheme.outlineVariant)
+                shape = RkbTokens.CardShape,
+                color = scheme.surface.copy(alpha = RkbTokens.GlassAlpha),
+                border = BorderStroke(1.dp, scheme.primary.copy(alpha = RkbTokens.BorderAlpha))
             ) {
-                if (shown.isNotEmpty() || showHorizon) {
-                    LazyColumn(
+                if (shown.isNotEmpty()) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 300.dp),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        if (showHorizon) {
-                            item { RkbHorizonInstanceCard(horizonVersion ?: "?") }
-                        }
                         items(shown, key = { it.toString() }) { version ->
                             VersionItemLayout(
                                 modifier = Modifier.fillMaxWidth(),
@@ -207,7 +200,7 @@ fun RkbInstancesScreen(
                             Text("NO INSTANCES YET", style = MaterialTheme.typography.titleMedium)
                             Text("Create your first Minecraft instance.", color = scheme.onSurfaceVariant)
                             Spacer(Modifier.height(12.dp))
-                            OutlinedButton(onClick = { backScreenViewModel.navigateToDownload() }) {
+                            OutlinedButton(onClick = { backScreenViewModel.navigateToNewInstance() }) {
                                 Icon(painterResource(R.drawable.ic_add), null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Add Instance")
@@ -236,28 +229,6 @@ private fun RkbDropdown(label: String, options: List<Pair<String, () -> Unit>>) 
             options.forEach { (text, action) ->
                 DropdownMenuItem(text = { Text(text) }, onClick = { open = false; action() })
             }
-        }
-    }
-}
-
-/** Entry for the separately installed Horizon (Rust Edition) app. It starts the external native app, not the Java pipeline. */
-@Composable
-private fun RkbHorizonInstanceCard(version: String) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scheme = MaterialTheme.colorScheme
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = scheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, Color(0xFFFF6A1A))
-    ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Horizon 26.3", style = MaterialTheme.typography.titleMedium)
-                Text("Minecraft Rust Edition, external native app (app version $version)", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                Text("Loader: Native", style = MaterialTheme.typography.labelMedium, color = Color(0xFFFF6A1A))
-            }
-            Button(onClick = { com.movtery.zalithlauncher.utils.RkbHorizon.launch(context) }) { Text("PLAY") }
         }
     }
 }

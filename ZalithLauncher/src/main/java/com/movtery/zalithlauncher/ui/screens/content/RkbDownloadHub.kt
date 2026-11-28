@@ -1,20 +1,18 @@
 /*
- * RKB LAUNCHER - "Instance Download" category hub: Normal Versions / Modpack / Rust Edition.
- * The three categories are kept separate; each opens its own existing or dedicated flow.
+ * RKB LAUNCHER - "New Instance" chooser (reference: New Instance screen) and Download page state.
+ *
+ * Normal and Modpack open their existing, fully functional install flows.
+ * Rust Edition and RKB BOOST are COMING SOON placeholders: no create / download / play actions.
  */
 package com.movtery.zalithlauncher.ui.screens.content
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,25 +22,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,148 +41,78 @@ import com.movtery.zalithlauncher.R
 
 /** Which page of the Download screen is showing. */
 object RkbDownloadHub {
-    enum class Page { Hub, Normal, ModPack, Rust }
+    /** Hub = New Instance chooser, Browse = Mods/Resource Packs/Shaders/... browser. */
+    enum class Page { Hub, Normal, ModPack, Browse }
 
-    var page by mutableStateOf(Page.Hub)
+    var page by mutableStateOf(Page.Browse)
 }
-
-private val Blue = Color(0xFF00A8FF)
-private val Violet = Color(0xFF8A5CFF)
-private val Orange = Color(0xFFFF6A1A)
 
 @Composable
 fun RkbDownloadHubScreen(
     onNormal: () -> Unit,
     onModpack: () -> Unit,
-    onRust: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val appear by animateFloatAsState(if (shown) 1f else 0f, tween(350), label = "hubAppear")
-
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .alpha(appear)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column {
-            Text("INSTANCE DOWNLOAD", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-            Text(
-                "Download and manage Minecraft instances",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back")
+            }
+            Column {
+                Text("New Instance", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Choose a type to create a new instance", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val landscape = maxWidth > maxHeight
-            if (landscape) {
+            if (maxWidth >= 720.dp) {
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HubCard("NORMAL", "VERSIONS", "Vanilla, Fabric, Forge, NeoForge, Quilt and more", listOf("Vanilla", "Fabric", "Forge", "NeoForge", "Quilt"),
-                        "Browse Versions", Blue, onNormal, Modifier.weight(1f).fillMaxHeight())
-                    HubCard("MOD", "PACK", "Modrinth and CurseForge modpacks, installed as instances", listOf("Modrinth", "CurseForge"),
-                        "Browse Modpacks", Violet, onModpack, Modifier.weight(1f).fillMaxHeight())
-                    HubCard("RUST", "EDITION", "Minecraft 26.3 (Rust Edition) with Horizon", listOf("Horizon", "Native", "Experimental"),
-                        "Browse Horizon", Orange, onRust, Modifier.weight(1f).fillMaxHeight())
+                    TypeCards(onNormal, onModpack, Modifier.weight(1f))
                 }
             } else {
-                Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    HubCard("NORMAL", "VERSIONS", "Vanilla, Fabric, Forge, NeoForge, Quilt and more", listOf("Vanilla", "Fabric", "Forge", "NeoForge", "Quilt"),
-                        "Browse Versions", Blue, onNormal, Modifier.fillMaxWidth())
-                    HubCard("MOD", "PACK", "Modrinth and CurseForge modpacks, installed as instances", listOf("Modrinth", "CurseForge"),
-                        "Browse Modpacks", Violet, onModpack, Modifier.fillMaxWidth())
-                    HubCard("RUST", "EDITION", "Minecraft 26.3 (Rust Edition) with Horizon", listOf("Horizon", "Native", "Experimental"),
-                        "Browse Horizon", Orange, onRust, Modifier.fillMaxWidth())
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TypeCards(onNormal, onModpack, Modifier.fillMaxWidth())
                 }
             }
         }
     }
 }
 
+/** Emits the four type cards, each with [modifier]; works inside a Row or a Column. */
 @Composable
-private fun HubCard(
-    white: String,
-    accentWord: String,
-    description: String,
-    chips: List<String>,
-    button: String,
-    accent: Color,
-    onClick: () -> Unit,
-    modifier: Modifier
-) {
+private fun TypeCards(onNormal: () -> Unit, onModpack: () -> Unit, modifier: Modifier) {
+    RkbTypeCard("Normal", "Play Minecraft with the vanilla experience, or add Fabric, Forge, NeoForge or Quilt.", R.drawable.ic_sports_esports_outlined, onNormal, modifier)
+    RkbTypeCard("Modpack", "Play with Modrinth and CurseForge modpacks, installed as instances.", R.drawable.ic_package_2_outlined, onModpack, modifier)
+    RkbComingSoonTypeCard(RkbUpcoming.RustEdition, modifier)
+    RkbComingSoonTypeCard(RkbUpcoming.RkbBoost, modifier)
+}
+
+@Composable
+private fun RkbTypeCard(title: String, description: String, icon: Int, onClick: () -> Unit, modifier: Modifier) {
+    val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = modifier
-            .drawBehind {
-                // soft glow: a wider translucent stroke behind the border
-                drawRoundRect(
-                    color = accent.copy(alpha = 0.22f),
-                    cornerRadius = CornerRadius(20.dp.toPx()),
-                    style = Stroke(width = 10.dp.toPx())
-                )
-            }
-            .clip(shape)
-            .clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         shape = shape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(2.dp, Brush.verticalGradient(listOf(accent, accent.copy(alpha = 0.35f))))
+        color = scheme.surface.copy(alpha = 0.7f),
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.7f))
     ) {
         Column(
-            Modifier
-                .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.18f), Color.Transparent)))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            Modifier.padding(16.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                painter = painterResource(
-                    when (accent) {
-                        Blue -> R.drawable.ic_sports_esports_outlined
-                        Violet -> R.drawable.ic_package_2_outlined
-                        else -> R.drawable.ic_settings_filled
-                    }
-                ),
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(52.dp)
-            )
-            Row {
-                Text(white, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+            Icon(painterResource(icon), null, tint = scheme.primary, modifier = Modifier.size(72.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(22.dp)) {
+                Icon(painterResource(R.drawable.ic_play_arrow_filled), null, Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(accentWord, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = accent)
-            }
-            Text(
-                description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                chips.take(4).forEach { chip ->
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = accent.copy(alpha = 0.15f)
-                    ) {
-                        Text(chip, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-            Spacer(Modifier.weight(1f, fill = false))
-            Surface(
-                modifier = Modifier.fillMaxWidth().height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = accent
-            ) {
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Icon(painterResource(R.drawable.ic_download_2_outlined), null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(button, color = Color.White, fontWeight = FontWeight.Bold)
-                }
+                Text("Create", fontWeight = FontWeight.Bold)
             }
         }
     }

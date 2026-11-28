@@ -7,6 +7,26 @@
 package com.movtery.zalithlauncher.ui.screens.main
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,15 +65,16 @@ import com.movtery.zalithlauncher.ui.screens.NormalNavKey
 import com.movtery.zalithlauncher.ui.screens.TitledNavKey
 
 /** Destinations shown in the RKB rail, in the order used by the reference screenshots. */
-enum class RkbDestination(val label: String, val icon: Int) {
-    Home("Home", R.drawable.ic_home_filled),
-    Account("Account", R.drawable.ic_person_outlined),
-    Mods("Mods", R.drawable.ic_extension_outlined),
-    Control("Control", R.drawable.ic_videogame_asset_outlined),
-    About("About", R.drawable.ic_info_outlined),
-    Instances("Instances", R.drawable.ic_folder_outlined),
-    Download("Download", R.drawable.ic_download_2_outlined),
-    Setting("Setting", R.drawable.ic_settings_filled),
+enum class RkbDestination(val label: String, val icon: Int, val inPill: Boolean) {
+    Home("Home", R.drawable.ic_home_filled, true),
+    Instances("Instances", R.drawable.ic_folder_outlined, true),
+    Download("Download", R.drawable.ic_download_2_outlined, true),
+    Mods("Mods", R.drawable.ic_extension_outlined, true),
+    Control("Controls", R.drawable.ic_videogame_asset_outlined, true),
+    // Reached from the right-hand cluster (gear / avatar menu), not from the pill.
+    Account("Account", R.drawable.ic_person_outlined, false),
+    About("About", R.drawable.ic_info_outlined, false),
+    Setting("Settings", R.drawable.ic_settings_filled, false),
 }
 
 /** Works out which rail item matches the screen currently shown. */
@@ -61,6 +82,7 @@ fun rkbSelectedDestination(mainScreenKey: TitledNavKey?): RkbDestination? = when
     null, is NormalNavKey.LauncherMain -> RkbDestination.Home
     is NormalNavKey.AccountManager -> RkbDestination.Account
     is NormalNavKey.VersionsManager -> RkbDestination.Instances
+    is NormalNavKey.ModSettings -> RkbDestination.Mods
     is NestedNavKey.Download -> RkbDestination.Download
     is NestedNavKey.VersionSettings ->
         if (mainScreenKey.currentKey is NormalNavKey.Versions.ModsManager) RkbDestination.Mods
@@ -74,51 +96,151 @@ fun rkbSelectedDestination(mainScreenKey: TitledNavKey?): RkbDestination? = when
     else -> null
 }
 
+/** Frosted-glass container shared by the pill nav and the right-hand cluster. */
 @Composable
-fun RkbNavigationRail(
-    selected: RkbDestination?,
-    onSelect: (RkbDestination) -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun RkbGlassPill(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    Surface(
-        modifier = modifier.fillMaxHeight().width(136.dp),
-        color = scheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            RkbDestination.entries.forEach { dest ->
-                RkbRailItem(dest, dest == selected) { onSelect(dest) }
-            }
-            Spacer(Modifier.height(4.dp))
-        }
-    }
+    val shape = RoundedCornerShape(26.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(scheme.surface.copy(alpha = 0.62f), shape)
+            .border(1.dp, scheme.primary.copy(alpha = 0.35f), shape)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content
+    )
 }
 
 @Composable
-private fun RkbRailItem(dest: RkbDestination, selected: Boolean, onClick: () -> Unit) {
+private fun RkbPillItem(dest: RkbDestination, selected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(12.dp)
-    val bg = if (selected) Brush.horizontalGradient(listOf(scheme.primaryContainer, scheme.primary))
-    else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
+    val shape = RoundedCornerShape(20.dp)
     val tint = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(36.dp)
-            .background(bg, shape)
+            .heightIn(min = 40.dp)
+            .clip(shape)
+            .background(if (selected) scheme.primaryContainer.copy(alpha = 0.85f) else Color.Transparent, shape)
+            .then(if (selected) Modifier.border(1.dp, scheme.primary.copy(alpha = 0.8f), shape) else Modifier)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(painterResource(dest.icon), contentDescription = dest.label, tint = tint, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(8.dp))
+        Icon(painterResource(dest.icon), contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(6.dp))
         Text(dest.label, color = tint, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+    }
+}
+
+/**
+ * Top bar from the reference designs: brand logo, centered glass pill with the main destinations,
+ * and a right-hand cluster (tasks, settings, account menu). The pill scrolls horizontally so it
+ * never clips on narrow phones.
+ */
+@Composable
+fun RkbTopNavBar(
+    selected: RkbDestination?,
+    showBack: Boolean,
+    tasksActive: Boolean,
+    onBack: () -> Unit,
+    onSelect: (RkbDestination) -> Unit,
+    onToggleTasks: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scheme = MaterialTheme.colorScheme
+    val account = com.movtery.zalithlauncher.game.account.AccountsManager.currentAccountFlow
+        .collectAsState().value
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.statusBars).only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (showBack) {
+            IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
+                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back", tint = scheme.onSurface)
+            }
+        }
+        Image(
+            painter = painterResource(R.drawable.rkb_logo),
+            contentDescription = "RKB LAUNCHER",
+            modifier = Modifier.height(40.dp)
+        )
+        RkbGlassPill(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RkbDestination.entries.filter { it.inPill }.forEach { dest ->
+                    RkbPillItem(dest, dest == selected) { onSelect(dest) }
+                }
+            }
+        }
+        RkbGlassPill {
+            IconButton(onClick = onToggleTasks, modifier = Modifier.size(40.dp)) {
+                Box {
+                    Icon(painterResource(R.drawable.ic_assignment_filled), contentDescription = "Tasks", tint = scheme.onSurface, modifier = Modifier.size(22.dp))
+                    if (tasksActive) {
+                        Box(
+                            Modifier.size(9.dp).align(Alignment.TopEnd)
+                                .background(scheme.primary, androidx.compose.foundation.shape.CircleShape)
+                        )
+                    }
+                }
+            }
+            IconButton(onClick = { onSelect(RkbDestination.Setting) }, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    painterResource(R.drawable.ic_settings_filled), contentDescription = "Settings",
+                    tint = if (selected == RkbDestination.Setting) scheme.primary else scheme.onSurface,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Box {
+                Row(
+                    modifier = Modifier
+                        .heightIn(min = 40.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { menuOpen = true }
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (account != null) {
+                        com.movtery.zalithlauncher.ui.screens.content.elements.PlayerFace(
+                            modifier = Modifier.clip(androidx.compose.foundation.shape.CircleShape),
+                            account = account,
+                            avatarSize = 28.dp
+                        )
+                    } else {
+                        Icon(painterResource(R.drawable.ic_person_outlined), contentDescription = "Account", tint = scheme.onSurface, modifier = Modifier.size(24.dp))
+                    }
+                    Icon(painterResource(R.drawable.ic_keyboard_arrow_down), contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    val name = account?.username ?: "No account"
+                    val kind = when {
+                        account == null -> "Add an account"
+                        account.isLocalAccount() -> "Local account"
+                        else -> "Online account"
+                    }
+                    DropdownMenuItem(
+                        text = { Column { Text(name, style = MaterialTheme.typography.labelLarge); Text(kind, style = MaterialTheme.typography.labelSmall, color = scheme.primary) } },
+                        onClick = { menuOpen = false; onSelect(RkbDestination.Account) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_person_outlined), null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("About") },
+                        onClick = { menuOpen = false; onSelect(RkbDestination.About) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_info_outlined), null) }
+                    )
+                }
+            }
+        }
     }
 }
 

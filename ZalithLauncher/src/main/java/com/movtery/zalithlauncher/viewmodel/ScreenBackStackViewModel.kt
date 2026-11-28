@@ -52,6 +52,10 @@ class ScreenBackStackViewModel : ViewModel() {
     val clearBeforeNavKeys = listOf(
         settingsScreen::class,
         downloadScreen::class,
-        NormalNavKey.Multiplayer::class
+        NormalNavKey.Multiplayer::class,
+        // RKB: top-bar destinations replace each other instead of stacking
+        NormalNavKey.ModSettings::class,
+        NormalNavKey.AccountManager::class,
+        NormalNavKey.VersionsManager::class
     )
 }

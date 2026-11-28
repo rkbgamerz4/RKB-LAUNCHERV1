@@ -97,6 +97,11 @@ fun AboutInfoScreen(
             contentPadding = PaddingValues(all = 12.dp)
         ) { scope ->
             animatedItem(scope) { yOffset ->
+                com.movtery.zalithlauncher.ui.screens.content.RkbAboutCard(
+                    Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) }.padding(bottom = 12.dp)
+                )
+            }
+            animatedItem(scope) { yOffset ->
                 ChunkLayout(
                     modifier = Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) },
                     title = stringResource(R.string.about_launcher_title)

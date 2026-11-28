@@ -55,6 +55,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -168,14 +169,21 @@ fun MainScreen(
         backgroundColor().copy(alpha = launcherBackgroundOpacity)
     } else backgroundColor()
 
+    Box(Modifier.fillMaxSize()) {
+    // RKB: shared wallpaper/gradient layer; skipped when the legacy launcher background is active
+    if (!isBackgroundValid) com.movtery.zalithlauncher.ui.screens.content.RkbBackdrop()
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = backgroundColor,
-        contentColor = onBackgroundColor()
+        color = if (isBackgroundValid) backgroundColor else Color.Transparent,
+        contentColor = if (isBackgroundValid) onBackgroundColor() else MaterialTheme.colorScheme.onSurface
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-        RkbNavigationRail(
+        Column(modifier = Modifier.fillMaxSize()) {
+        RkbTopNavBar(
             selected = rkbSelectedDestination(mainScreenKey),
+            showBack = !inLauncherScreen && rkbSelectedDestination(mainScreenKey)?.inPill != true,
+            tasksActive = tasks.isNotEmpty(),
+            onBack = { screenBackStackModel.mainScreen.backStack.removeFirstOrNull() },
+            onToggleTasks = { changeTasksExpandedState() },
             onSelect = { dest ->
                 val clear = screenBackStackModel.clearBeforeNavKeys
                 when (dest) {
@@ -186,19 +194,9 @@ fun MainScreen(
                     RkbDestination.Instances -> screenBackStackModel.mainScreen.removeAndNavigateTo(
                         removes = clear, screenKey = NormalNavKey.VersionsManager
                     )
-                    RkbDestination.Mods -> {
-                        // The mod manager is per-instance; without a selected instance, pick one first.
-                        val version = VersionsManager.currentVersion.value
-                        if (version == null) {
-                            screenBackStackModel.mainScreen.removeAndNavigateTo(
-                                removes = clear, screenKey = NormalNavKey.VersionsManager
-                            )
-                        } else {
-                            val key = NestedNavKey.VersionSettings(version)
-                            key.navigateTo(NormalNavKey.Versions.ModsManager)
-                            screenBackStackModel.mainScreen.navigateTo(key, useClassEquality = true)
-                        }
-                    }
+                    RkbDestination.Mods -> screenBackStackModel.mainScreen.removeAndNavigateTo(
+                        removes = clear, screenKey = NormalNavKey.ModSettings
+                    )
                     RkbDestination.Download -> screenBackStackModel.navigateToDownload()
                     RkbDestination.Control, RkbDestination.About, RkbDestination.Setting -> {
                         val target = when (dest) {
@@ -218,48 +216,8 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
+                .fillMaxWidth()
         ) {
-            TopBar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp),
-                mainScreenKey = mainScreenKey,
-                inLauncherScreen = inLauncherScreen,
-                taskRunning = tasks.isEmpty(),
-                isTasksExpanded = isTaskMenuExpanded,
-                contentColor = onBackgroundColor(),
-                onScreenBack = {
-                    screenBackStackModel.mainScreen.backStack.removeFirstOrNull()
-                },
-                toMainScreen = toMainScreen,
-                toSettingsScreen = {
-                    screenBackStackModel.mainScreen.removeAndNavigateTo(
-                        removes = screenBackStackModel.clearBeforeNavKeys,
-                        screenKey = screenBackStackModel.settingsScreen
-                    )
-                },
-                toDownloadScreen = {
-                    screenBackStackModel.navigateToDownload()
-                },
-                toMultiplayerScreen = {
-                    screenBackStackModel.mainScreen.removeAndNavigateTo(
-                        removes = screenBackStackModel.clearBeforeNavKeys,
-                        screenKey = NormalNavKey.Multiplayer
-                    )
-                },
-                openFileManager = {
-                    eventViewModel.sendEvent(
-                        EventViewModel.Event.OpenFileManager(
-                            rootPath = PathManager.DIR_FILES_EXTERNAL.absolutePath
-                        )
-                    )
-                },
-                changeExpandedState = {
-                    changeTasksExpandedState()
-                },
-            )
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -290,204 +248,7 @@ fun MainScreen(
         }
         }
     }
-}
-
-@Composable
-private fun <E: TitledNavKey> TopBar(
-    mainScreenKey: E?,
-    inLauncherScreen: Boolean,
-    taskRunning: Boolean,
-    isTasksExpanded: Boolean,
-    modifier: Modifier = Modifier,
-    contentColor: Color,
-    onScreenBack: () -> Unit,
-    toMainScreen: () -> Unit,
-    toSettingsScreen: () -> Unit,
-    toDownloadScreen: () -> Unit,
-    toMultiplayerScreen: () -> Unit,
-    openFileManager: () -> Unit,
-    changeExpandedState: () -> Unit,
-) {
-    val festivals = LocalFestivals.current
-
-    val inMultiplayerScreen = mainScreenKey is NormalNavKey.Multiplayer
-    val inDownloadScreen = mainScreenKey is NestedNavKey.Download
-    val inSettingsScreen = mainScreenKey is NestedNavKey.Settings
-
-    CompositionLocalProvider(
-        LocalContentColor provides contentColor
-    ) {
-        ConstraintLayout(modifier = modifier) {
-            val (backCenter, title, endButtons) = createRefs()
-
-            val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-
-            Row(
-                modifier = Modifier
-                    .constrainAs(backCenter) {
-                        start.linkTo(parent.start)
-                        top.linkTo(parent.top)
-                        bottom.linkTo(parent.bottom)
-                    }
-                    .fillMaxHeight()
-            ) {
-                AnimatedVisibility(
-                    visible = !inLauncherScreen
-                ) {
-                    Row(modifier = Modifier.fillMaxHeight()) {
-                        Spacer(Modifier.width(12.dp))
-
-                        IconButton(
-                            modifier = Modifier.fillMaxHeight(),
-                            onClick = {
-                                if (!inLauncherScreen) {
-                                    //不在主屏幕时才允许返回
-                                    backDispatcher?.onBackPressed() ?: run {
-                                        onScreenBack()
-                                    }
-                                }
-                            }
-                        ) {
-                            Icon(
-                                modifier = Modifier.size(24.dp),
-                                painter = painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = stringResource(R.string.generic_back)
-                            )
-                        }
-
-                        IconButton(
-                            modifier = Modifier.fillMaxHeight(),
-                            onClick = {
-                                if (!inLauncherScreen) {
-                                    //不在主屏幕时才允许回到主页面
-                                    toMainScreen()
-                                }
-                            }
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_home_filled),
-                                contentDescription = stringResource(R.string.generic_main_menu)
-                            )
-                        }
-                    }
-                }
-            }
-            val parentRes = mainScreenKey?.title
-            val childRes = (mainScreenKey as? BackStackNavKey<*>)?.currentKey?.title
-
-            Crossfade(
-                modifier = Modifier.constrainAs(title) {
-                    centerVerticallyTo(parent)
-                    start.linkTo(backCenter.end, margin = 16.dp)
-                },
-                targetState = parentRes to childRes
-            ) { (parent, child) ->
-                val style = MaterialTheme.typography.titleMedium
-                val softWarp = false
-                val maxLines = 1
-
-                if (parent == null) {
-                    if (festivals.isEmpty()) {
-                        RkbBrandTitle()
-                    } else {
-                        FestivalTitleText(
-                            festivals = festivals,
-                            style = style,
-                            maxLines = maxLines
-                        )
-                    }
-                } else {
-                    val titleText = if (child != null) {
-                        androidText(parent, androidText(" - "), child)
-                    } else {
-                        parent
-                    }
-
-                    AndroidStringText(
-                        text = titleText,
-                        style = style,
-                        softWrap = softWarp,
-                        maxLines = maxLines
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .constrainAs(endButtons) {
-                        top.linkTo(parent.top)
-                        bottom.linkTo(parent.bottom)
-                        end.linkTo(parent.end, margin = 12.dp)
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AnimatedVisibility(
-                    visible = !(isTasksExpanded || taskRunning),
-                    enter = slideInVertically(
-                        initialOffsetY = { -50 }
-                    ) + fadeIn(),
-                    exit = slideOutVertically(
-                        targetOffsetY = { -50 }
-                    ) + fadeOut()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(shape = MaterialTheme.shapes.large)
-                            .clickable { changeExpandedState() }
-                            .padding(all = 8.dp)
-                            .width(120.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        LinearProgressIndicator(modifier = Modifier.weight(1f))
-                        Icon(
-                            modifier = Modifier.size(22.dp),
-                            painter = painterResource(R.drawable.ic_assignment_filled),
-                            contentDescription = stringResource(R.string.main_task_menu)
-                        )
-                    }
-                }
-
-                RkbAccountChip()
-            }
-        }
     }
-}
-
-@Composable
-private fun TopBarRailItem(
-    selected: Boolean,
-    painter: Painter,
-    text: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {},
-    textStyle: TextStyle = MaterialTheme.typography.labelMedium
-) {
-    TextRailItem(
-        modifier = modifier,
-        onClick = onClick,
-        text = {
-            AnimatedVisibility(visible = selected) {
-                Row {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = text,
-                        style = textStyle
-                    )
-                }
-            }
-        },
-        icon = {
-            Icon(
-                painter = painter,
-                contentDescription = text
-            )
-        },
-        selected = selected,
-        selectedPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-        unSelectedPadding = PaddingValues(all = 8.dp),
-    )
 }
 
 @Composable
@@ -645,6 +406,22 @@ private fun NavigationUI(
                         assetInfoScreenKey = key.currentKey,
                         eventViewModel = eventViewModel,
                         submitError = submitError,
+                    )
+                }
+                entry<NormalNavKey.ModSettings> {
+                    com.movtery.zalithlauncher.ui.screens.content.RkbModSettingsScreen(
+                        version = VersionsManager.currentVersion.collectAsState().value,
+                        onChooseInstance = {
+                            screenBackStackModel.mainScreen.removeAndNavigateTo(
+                                removes = screenBackStackModel.clearBeforeNavKeys,
+                                screenKey = NormalNavKey.VersionsManager
+                            )
+                        },
+                        onOpenFullManager = { version ->
+                            val key = NestedNavKey.VersionSettings(version)
+                            key.navigateTo(NormalNavKey.Versions.ModsManager)
+                            screenBackStackModel.mainScreen.navigateTo(key, useClassEquality = true)
+                        }
                     )
                 }
                 entry<NormalNavKey.Multiplayer> {
