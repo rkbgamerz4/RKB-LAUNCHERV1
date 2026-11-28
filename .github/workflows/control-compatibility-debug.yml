@@ -1,21 +1,22 @@
-name: RKB Control Compatibility Debug APK
+name: RKB Launcher Debug APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - feature/control-compatibility
+      - feature/rkb-final-redesign
 
 permissions:
   contents: read
 
 concurrency:
-  group: control-compatibility-debug-${{ github.ref }}
+  group: rkb-debug-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build RKB Launcher debug APK (arm64)
+    name: Build RKB Launcher Debug APK (arm64)
     runs-on: ubuntu-22.04
     timeout-minutes: 120
 
@@ -27,10 +28,10 @@ jobs:
     steps:
       - name: Verify runner architecture
         run: |
-          echo "Runner architecture: $(uname -m)"
+          echo "Runner: $(uname -m)"
           test "$(uname -m)" = "x86_64"
 
-      - name: Checkout control compatibility branch
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -55,11 +56,13 @@ jobs:
             SDKMGR="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -n 1)"
           fi
           if [ -z "$SDKMGR" ]; then
-            echo "::error::sdkmanager not found in Android SDK"
+            echo "::error::sdkmanager not found"
             exit 1
           fi
+
           echo "Using sdkmanager: $SDKMGR"
           yes | "$SDKMGR" --licenses >/dev/null || true
+
           "$SDKMGR" "platform-tools" "platforms;android-37.2" "ndk;25.2.9519653" "cmake;3.22.1" || \
             "$SDKMGR" "platform-tools" "platforms;android-37" "ndk;25.2.9519653" "cmake;3.22.1"
 
@@ -67,7 +70,6 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run control compatibility unit tests
-        shell: bash
         run: |
           ./gradlew :LayerController:testDebugUnitTest \
             --no-daemon \
@@ -82,8 +84,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Build actual RKB Launcher debug APK
-        shell: bash
+      - name: Build RKB Launcher debug APK
         run: |
           ./gradlew :ZalithLauncher:assembleDebug \
             -Darch=arm64 \
@@ -95,18 +96,19 @@ jobs:
         run: |
           shopt -s nullglob
           apks=(ZalithLauncher/build/outputs/apk/debug/*.apk)
+
           if [ "${#apks[@]}" -eq 0 ]; then
-            echo "::error::No debug APK found in ZalithLauncher/build/outputs/apk/debug"
+            echo "::error::No debug APK found"
             exit 1
           fi
-          printf 'Found %s debug APK(s):\n' "${#apks[@]}"
+
           ls -lh "${apks[@]}"
           sha256sum "${apks[@]}"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: RKB-Launcher-debug-arm64-control-compatibility
+          name: RKB-Launcher-debug-arm64
           path: ZalithLauncher/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
